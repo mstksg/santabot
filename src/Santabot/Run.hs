@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -59,8 +60,8 @@ launchIRC channels nick pwd tick bot = do
 
     Right irc <- connect (ircConf channels nick pwd started eventQueue) True True
 
-    let sendResp R{..} = sendMsg irc (T.encodeUtf8 . T.pack $ rRoom)
-                                     (T.encodeUtf8 rBody)
+    let sendResp R{..} = sendMsg irc (T.encodeUtf8 $ T.pack rRoom)
+                                     (T.encodeUtf8 $ " " <> rBody)
 
     _ <- forkIO $ do
       () <- takeMVar started
