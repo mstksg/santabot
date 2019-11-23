@@ -73,17 +73,18 @@ commandBot C{..} = C.concatMapM parseMe
 
 data Alert m = forall a. A
     { aTrigger :: Interval LocalTime -> m (Maybe a)
-    , aResp    :: a -> m Resp
+    , aResp    :: a -> m Text
     }
 
 alertBot
     :: MonadIO m
-    => Alert m
+    => String       -- ^ channel
+    -> Alert m
     -> Bot m ()
-alertBot A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
-              .| consecs
-              .| C.concatMapM aTrigger
-              .| C.mapM aResp
+alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
+                .| consecs
+                .| C.concatMapM aTrigger
+                .| C.mapM (fmap (R c) . aResp)
   where
     consecs = do
         x0 <- await

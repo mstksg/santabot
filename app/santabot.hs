@@ -20,11 +20,15 @@ instance A.FromJSON Conf where
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
+targetRoom :: String
+-- targetRoom = "##adventofcode"
+targetRoom = "##snatabot-test"
+
 masterBot :: Bot IO ()
 masterBot = mergeBots
-  [ commandBot eventLink
-  , alertBot challengeCountdown
-  , alertBot eventCountdown
+  [ commandBot puzzleLink
+  , alertBot targetRoom challengeCountdown
+  , alertBot targetRoom eventCountdown
   -- , alertBot acknowledgeTick
   ]
 

@@ -2,13 +2,14 @@
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RecordWildCards           #-}
+{-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeInType                #-}
 {-# LANGUAGE ViewPatterns              #-}
 
 module Santabot (
-    eventLink
+    puzzleLink
   , challengeCountdown
   , eventCountdown
   , acknowledgeTick
@@ -23,6 +24,7 @@ import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
+import           Data.Map                  (Map)
 import           Data.Maybe
 import           Data.Set                  (Set)
 import           Data.Time                 as Time
@@ -33,29 +35,37 @@ import           Servant.Links
 import           Text.Megaparsec
 import           Text.Printf
 import           Text.Read                 (readMaybe)
+import qualified Data.Map                  as M
 import qualified Data.Set                  as S
 import qualified Data.Text                 as T
 import qualified Numeric.Interval          as I
 
 
-eventLink :: MonadIO m => Command m
-eventLink = C
+puzzleLink :: forall m. MonadIO m => Command m
+puzzleLink = C
     { cName  = "link"
-    , cHelp  = "Get the link to a given event (!link 2017 23, !link 16).  Assumes current year if no year or invalid year given."
+    , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  Gives the most recent released puzzle of that day, unless a valid year is given."
     , cParse = askLink
     , cResp  = pure . T.pack . uncurry displayLink
     }
   where
     askLink M{..} = runMaybeT $ do
         day      <- maybe empty pure . listToMaybe . mapMaybe mkDay $ w
-        (yr,_,_) <- toGregorian . localDay <$> liftIO aocTime
-        let year = fromMaybe yr . find (`S.member` validYears) $ w
-        pure (year, day)
+        hasDays  <- M.keysSet . M.filter (S.member day) <$> liftIO allPuzzles
+        let givenYear = find (`S.member` hasDays) w
+            trueYear  = case givenYear of
+              Just k | k `S.member` hasDays -> k
+              _                             -> S.findMax hasDays
+        pure (trueYear, day)
       where
         w = mapMaybe (readMaybe . T.unpack) . T.words . T.map clear $ mBody
         clear c
           | isDigit c = c
           | otherwise = ' '
+
+allPuzzles :: IO (Map Integer (Set Advent.Day))
+allPuzzles = sequence . flip M.fromSet validYears $ \y -> S.fromList <$>
+    filterM (challengeReleased y) (Day <$> finites)
 
 data ChallengeEvent = CEHour
                     | CETenMin
@@ -65,7 +75,7 @@ data ChallengeEvent = CEHour
 challengeCountdown :: Applicative m => Alert m
 challengeCountdown = A
     { aTrigger = pure . challengeEvent
-    , aResp    = fmap (R "##elfbot-test" . T.pack) . pure . uncurry displayCE
+    , aResp    = pure . T.pack . uncurry displayCE
     }
   where
     challengeEvent i = do
@@ -91,7 +101,7 @@ challengeCountdown = A
 eventCountdown :: Applicative m => Alert m
 eventCountdown = A
     { aTrigger = pure . countdownEvent
-    , aResp    = fmap (R "##elfbot-test" . T.pack) . pure . uncurry displayCE
+    , aResp    = pure . T.pack . uncurry displayCE
     }
   where
     countdownEvent i = do
@@ -112,7 +122,7 @@ eventCountdown = A
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A
     { aTrigger = pure . Just
-    , aResp    = pure . R "##elfbot-test" . T.pack . show
+    , aResp    = pure . T.pack . show
     }
 
 validYears :: Set Integer
