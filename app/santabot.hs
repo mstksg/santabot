@@ -29,9 +29,9 @@ masterBot alerts = mergeBots
       [ puzzleLink
       , nextPuzzle
       , simpleCommand "about" "Information about santabot" . pure $
-          "Helper bot for ##adventofcode and advent of code utilities developed my jle`.  Source at https://github.com/mstksg/santabot"
+          "Helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
       , simpleCommand "leaderboard" "IRC leaderboard" . pure $
-          "Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/2018/leaderboard/private/view/382266"
+          "Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/2018/leaderboard/private/view/382266."
       ]
   , alertBot alerts challengeCountdown
   , alertBot alerts eventCountdown
