@@ -26,19 +26,21 @@ ghc-options:
 - -Werror=incomplete-patterns
 
 dependencies:
+- advent-of-code-api
 - base >= 4.7 && < 5
 - conduit
-- time
-- text
-- transformers
-- megaparsec
-- finite-typelits
-- advent-of-code-api
 - containers
+- finite-typelits
+- intervals
+- megaparsec
 - servant
 - servant-client
 - servant-client-core
-- intervals
+- stm-chans
+- stm-conduit
+- text
+- time
+- transformers
 
 library:
   source-dirs: src
