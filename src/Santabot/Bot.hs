@@ -19,6 +19,7 @@ module Santabot.Bot (
   , commandBots
   , alertBot
   , mergeBots
+  , simpleCommand
   , helpBot
   , aocTime
   ) where
@@ -98,6 +99,19 @@ helpBot cs = C
     processHelp = \case
       Nothing         -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
       Just (cmd, msg) -> T.pack $ printf "%s: %s" (T.unpack cmd) (T.unpack msg)
+
+simpleCommand
+    :: Applicative m
+    => Text             -- ^ trigger
+    -> Text             -- ^ help
+    -> m Text           -- ^ response
+    -> Command m
+simpleCommand nm hlp resp = C
+    { cName  = nm
+    , cHelp  = hlp
+    , cParse = \_ -> pure $ Right ()
+    , cResp  = const resp
+    }
 
 -- | Like 'mergeBots' except adds help message
 commandBots

@@ -74,25 +74,19 @@ allPuzzles = do
       filterM (challengeReleased y) (Day <$> finites)
 
 nextPuzzle :: MonadIO m => Command m
-nextPuzzle = C
-    { cName  = "next"
-    , cHelp  = "Display the time until the next puzzle release."
-    , cParse = \_ -> pure $ Right ()
-    , cResp  = const printNext
-    }
+nextPuzzle = simpleCommand "next" "Display the time until the next puzzle release." $ do
+    t <- liftIO aocTime
+    let (y, d)    = nextDay (localDay t)
+        nextTime  = LocalTime (fromGregorian y 12 (fromIntegral (dayInt d))) midnight
+        dur       = realToFrac $ nextTime `diffLocalTime` t
+        durString = T.unpack . T.strip . T.pack
+                  $ DD.humanReadableDuration dur
+    pure . T.pack $ printf
+      "Next puzzle (%d Day %d) will be released in %s."
+      y
+      (dayInt d)
+      durString
   where
-    printNext = do
-      t <- liftIO aocTime
-      let (y, d)    = nextDay (localDay t)
-          nextTime  = LocalTime (fromGregorian y 12 (fromIntegral (dayInt d))) midnight
-          dur       = realToFrac $ nextTime `diffLocalTime` t
-          durString = T.unpack . T.strip . T.pack
-                    $ DD.humanReadableDuration dur
-      pure . T.pack $ printf
-        "Next puzzle (%d Day %d) will be released in %s."
-        y
-        (dayInt d)
-        durString
     nextDay (toGregorian->(y,m,d))
       | m < 12    = (y, minBound)
       | otherwise = case mkDay (fromIntegral d) of
