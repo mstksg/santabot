@@ -3,7 +3,14 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: simpleirc-0.3.1@sha256:f2103c759d55013db3a4d1a62de253af909d96ced9dd7eb3db10dc081f8525c4,1344
+    pantry-tree:
+      size: 403
+      sha256: f371a22e37a3f39d7a8d70be9eb51343b57092948cb25155c286085b788cefa0
+  original:
+    hackage: simpleirc-0.3.1
 snapshots:
 - completed:
     size: 421719

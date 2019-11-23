@@ -47,8 +47,7 @@ eventLink = C
   where
     askLink M{..} = runMaybeT $ do
         day  <- maybe empty pure . listToMaybe . mapMaybe mkDay $ w
-        (yr,_,_) <- toGregorian . localDay . utcToLocalTime (read "EST")
-          <$> liftIO getCurrentTime
+        (yr,_,_) <- toGregorian . localDay <$> liftIO aocTime
         let year = fromMaybe yr . find (`S.member` validYears) $ w
         pure (year, day)
       where
@@ -103,7 +102,7 @@ eventCountdown = A
         (y,_,_) = toGregorian d
         daysLeft = packFinite @14 $ (fromGregorian y 12 1 `diffDays` d) - 1
 
-    displayCE d y = printf "%d day%s left until Advent of Code %y!" n suff y
+    displayCE d = printf "%d day%s left until Advent of Code %y!" n suff
       where
         n = getFinite d + 1
         suff | n == 1    = "" :: String

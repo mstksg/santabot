@@ -36,6 +36,8 @@ dependencies:
 - servant
 - servant-client
 - servant-client-core
+- simpleirc
+- stm
 - stm-chans
 - stm-conduit
 - text

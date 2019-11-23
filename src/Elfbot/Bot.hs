@@ -1,5 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE MonadComprehensions       #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE TupleSections             #-}
@@ -17,9 +18,11 @@ module Elfbot.Bot (
   , commandBot
   , alertBot
   , mergeBots
+  , aocTime
   ) where
 
 import           Conduit
+import           Data.Foldable
 import           Data.Functor
 import           Data.Text                (Text)
 import           Data.Time                as Time
@@ -33,7 +36,7 @@ data Message = M { mRoom :: String
                  }
   deriving Show
 
-data Event = ETick
+data Event = ETick LocalTime            -- ^ time for AoC servers
            | EMsg  Message
   deriving Show
 
@@ -77,14 +80,20 @@ alertBot
     :: MonadIO m
     => Alert m
     -> Bot m ()
-alertBot A{..} = do
-    t0 <- utcToLocalTime (read "EST") <$> liftIO getCurrentTime
-    go t0
-      .| C.concatMapM aTrigger
-      .| awaitForever (\x -> lift (aResp x) >>= yield)
+alertBot A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
+              .| consecs
+              .| C.concatMapM aTrigger
+              .| awaitForever (\x -> lift (aResp x) >>= yield)
   where
-    go t0 = await >>= \_ -> do
-      t1 <- utcToLocalTime (read "EST") <$> liftIO getCurrentTime
-      yield (t0 ... t1)
-      go t1
+    consecs = do
+        x0 <- await
+        mapM_ go x0
+      where
+        go x0 = do
+          x1_ <- await
+          forM_ x1_ $ \x1 -> do
+            yield (x0 ... x1)
+            go x1
 
+aocTime :: IO LocalTime
+aocTime = utcToLocalTime (read "EST") <$> liftIO getCurrentTime
