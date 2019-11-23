@@ -8,7 +8,7 @@
 {-# LANGUAGE TypeInType                #-}
 {-# LANGUAGE ViewPatterns              #-}
 
-module Elfbot.Bot (
+module Santabot.Bot (
     Message(..)
   , Event(..)
   , Resp(..)

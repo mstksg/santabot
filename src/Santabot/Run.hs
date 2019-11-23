@@ -1,7 +1,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Elfbot.Run (
+module Santabot.Run (
     launchIRC
   ) where
 
@@ -14,8 +14,8 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Maybe
 import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
-import           Elfbot.Bot
 import           Network.SimpleIRC
+import           Santabot.Bot
 import           System.IO
 import qualified Data.Conduit.Combinators        as C
 import qualified Data.Text                       as T
@@ -23,9 +23,10 @@ import qualified Data.Text.Encoding              as T
 
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
-ircConf :: [String] -> String -> MVar () -> TBMQueue Event -> IrcConfig
-ircConf channels nick started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
+ircConf :: [String] -> String -> Maybe String -> MVar () -> TBMQueue Event -> IrcConfig
+ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
       { cChannels = channels
+      , cPass     = pwd
       , cEvents   = [Privmsg onMessage, Disconnect onDisc, Notice begin]
       }
   where
@@ -48,14 +49,15 @@ ircConf channels nick started eventQueue = (mkDefaultConfig "irc.freenode.org" n
 launchIRC
     :: [String]         -- ^ channels to join
     -> String           -- ^ nick
+    -> Maybe String     -- ^ password
     -> Int              -- ^ tick delay (microseconds)
     -> Bot IO ()
     -> IO ()
-launchIRC channels nick tick bot = do
+launchIRC channels nick pwd tick bot = do
     eventQueue <- atomically $ newTBMQueue 1000000
     started    <- newEmptyMVar
 
-    Right irc <- connect (ircConf channels nick started eventQueue) True True
+    Right irc <- connect (ircConf channels nick pwd started eventQueue) True True
 
     let sendResp R{..} = sendMsg irc (T.encodeUtf8 . T.pack $ rRoom)
                                      (T.encodeUtf8 rBody)
@@ -66,7 +68,6 @@ launchIRC channels nick tick bot = do
       forever $ do
         threadDelay tick
         t <- aocTime
-        hPutStrLn stderr $ "tick at " ++ show t
         atomically $ writeTBMQueue eventQueue (ETick t)
 
     runConduit $ sourceTBMQueue eventQueue

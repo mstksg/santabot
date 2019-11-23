@@ -7,7 +7,7 @@
 {-# LANGUAGE TypeInType                #-}
 {-# LANGUAGE ViewPatterns              #-}
 
-module Elfbot (
+module Santabot (
     eventLink
   , challengeCountdown
   , eventCountdown
@@ -26,7 +26,7 @@ import           Data.Foldable
 import           Data.Maybe
 import           Data.Set                  (Set)
 import           Data.Time                 as Time
-import           Elfbot.Bot
+import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
 import           Servant.Links

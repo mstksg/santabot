@@ -1,6 +1,6 @@
-name:                elfbot
+name:                santabot
 version:             0.1.0.0
-github:              "mstksg/elfbot"
+github:              "mstksg/santabot"
 license:             BSD3
 author:              "Justin Le"
 maintainer:          "justin@jle.im"
@@ -17,7 +17,7 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/mstksg/elfbot#readme>
+description:         Please see the README on GitHub at <https://github.com/mstksg/santabot#readme>
 
 ghc-options:
 - -Wall
@@ -48,18 +48,20 @@ library:
   source-dirs: src
 
 executables:
-  elfbot:
-    main:                elfbot.hs
+  santabot:
+    main:                santabot.hs
     source-dirs:         app
     ghc-options:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - elfbot
+    - santabot
+    - yaml
+    - aeson
 
 # tests:
-#   elfbot-test:
+#   santabot-test:
 #     main:                Spec.hs
 #     source-dirs:         test
 #     ghc-options:
@@ -67,4 +69,4 @@ executables:
 #     - -rtsopts
 #     - -with-rtsopts=-N
 #     dependencies:
-#     - elfbot
+#     - santabot
