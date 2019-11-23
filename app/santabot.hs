@@ -22,14 +22,13 @@ instance A.FromJSON Conf where
 
 targetRoom :: String
 -- targetRoom = "##adventofcode"
-targetRoom = "##snatabot-test"
+targetRoom = "##santabot-test"
 
 masterBot :: Bot IO ()
 masterBot = mergeBots
-  [ commandBot puzzleLink
+  [ commandBots [puzzleLink, nextPuzzle]
   , alertBot targetRoom challengeCountdown
   , alertBot targetRoom eventCountdown
-  -- , alertBot acknowledgeTick
   ]
 
 main :: IO ()

@@ -16,8 +16,10 @@ module Santabot.Bot (
   , Command(..)
   , Alert(..)
   , commandBot
+  , commandBots
   , alertBot
   , mergeBots
+  , helpBot
   , aocTime
   ) where
 
@@ -27,7 +29,9 @@ import           Data.Functor
 import           Data.Text                (Text)
 import           Data.Time                as Time
 import           Numeric.Interval         (Interval, (...))
+import           Text.Printf
 import qualified Data.Conduit.Combinators as C
+import qualified Data.Map                 as M
 import qualified Data.Text                as T
 
 data Message = M { mRoom :: String
@@ -70,6 +74,34 @@ commandBot C{..} = C.concatMapM parseMe
         -> fmap (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
     displayMe (room, x) = R room <$> cResp x
+
+helpBot
+    :: Applicative m
+    => [Command m]
+    -> Command m
+helpBot cs = C
+    { cName  = "help"
+    , cHelp  = "Display list of commands and their usage instructions"
+    , cParse = \M{..} -> pure . Just $
+        if mBody == ""
+          then Nothing
+          else Just . maybe (Left mBody) (Right . (mBody,)) $ M.lookup mBody cMap
+    , cResp  = pure . processHelp
+    }
+  where
+    cMap = M.fromList [ (cName, cHelp) | C{..} <- cs ]
+        <> M.singleton "help" "Display list of commands"
+    processHelp = \case
+      Nothing      -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
+      Just (Left cmd) -> T.pack $ printf "Command not found: %s" (T.unpack cmd)
+      Just (Right (cmd, msg)) -> T.pack $ printf "%s: %s" (T.unpack cmd) (T.unpack msg)
+
+-- | Like 'mergeBots' except adds help message
+commandBots
+    :: Monad m
+    => [Command m]
+    -> Bot m ()
+commandBots cs = mergeBots . map commandBot $ helpBot cs : cs
 
 data Alert m = forall a. A
     { aTrigger :: Interval LocalTime -> m (Maybe a)
