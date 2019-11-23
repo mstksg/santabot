@@ -62,14 +62,14 @@ commandBot
     => Command m
     -> Bot m ()
 commandBot C{..} = C.concatMapM parseMe
-                .| awaitForever displayMe
+                .| C.mapM displayMe
   where
     parseMe = \case
       EMsg m
         | Just (_, "", rest) <- T.commonPrefixes ("!" <> cName <> " ") (mBody m)
         -> fmap (mRoom m,) <$> cParse (m { mBody = rest })
       _ -> pure Nothing
-    displayMe (room, x) = yield . R room =<< lift (cResp x)
+    displayMe (room, x) = R room <$> cResp x
 
 data Alert m = forall a. A
     { aTrigger :: Interval LocalTime -> m (Maybe a)
@@ -83,7 +83,7 @@ alertBot
 alertBot A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
               .| consecs
               .| C.concatMapM aTrigger
-              .| awaitForever (\x -> lift (aResp x) >>= yield)
+              .| C.mapM aResp
   where
     consecs = do
         x0 <- await

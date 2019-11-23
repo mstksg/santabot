@@ -26,7 +26,7 @@ import qualified Data.Text.Encoding              as T
 ircConf :: [String] -> String -> MVar () -> TBMQueue Event -> IrcConfig
 ircConf channels nick started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
       { cChannels = channels
-      , cEvents   = [Privmsg onMessage, Disconnect onDisc, RawMsg begin]
+      , cEvents   = [Privmsg onMessage, Disconnect onDisc, Notice begin]
       }
   where
     onMessage _ IrcMessage{..} = void . runMaybeT $ do
@@ -51,7 +51,7 @@ launchIRC
     -> Int              -- ^ tick delay (microseconds)
     -> Bot IO ()
     -> IO ()
-launchIRC channels nick tick b = do
+launchIRC channels nick tick bot = do
     eventQueue <- atomically $ newTBMQueue 1000000
     started    <- newEmptyMVar
 
@@ -62,13 +62,15 @@ launchIRC channels nick tick b = do
 
     _ <- forkIO $ do
       () <- takeMVar started
+      threadDelay 5000000
       forever $ do
         threadDelay tick
         t <- aocTime
+        hPutStrLn stderr $ "tick at " ++ show t
         atomically $ writeTBMQueue eventQueue (ETick t)
 
     runConduit $ sourceTBMQueue eventQueue
-              .| b
+              .| bot
               .| C.iterM logResp
               .| C.mapM_ sendResp
               .| C.sinkNull

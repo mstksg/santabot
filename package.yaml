@@ -47,16 +47,16 @@ dependencies:
 library:
   source-dirs: src
 
-# executables:
-#   elfbot-exe:
-#     main:                Main.hs
-#     source-dirs:         app
-#     ghc-options:
-#     - -threaded
-#     - -rtsopts
-#     - -with-rtsopts=-N
-#     dependencies:
-#     - elfbot
+executables:
+  elfbot:
+    main:                elfbot.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - elfbot
 
 # tests:
 #   elfbot-test:

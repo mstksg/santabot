@@ -11,6 +11,7 @@ module Elfbot (
     eventLink
   , challengeCountdown
   , eventCountdown
+  , acknowledgeTick
   ) where
 
 import           Advent                    as Advent
@@ -46,7 +47,7 @@ eventLink = C
     }
   where
     askLink M{..} = runMaybeT $ do
-        day  <- maybe empty pure . listToMaybe . mapMaybe mkDay $ w
+        day      <- maybe empty pure . listToMaybe . mapMaybe mkDay $ w
         (yr,_,_) <- toGregorian . localDay <$> liftIO aocTime
         let year = fromMaybe yr . find (`S.member` validYears) $ w
         pure (year, day)
@@ -61,7 +62,7 @@ data ChallengeEvent = CEHour
                     | CEMinute
                     | CEStart
 
-challengeCountdown :: MonadIO m => Alert m
+challengeCountdown :: Applicative m => Alert m
 challengeCountdown = A
     { aTrigger = pure . challengeEvent
     , aResp    = fmap (R "##elfbot-test" . T.pack) . pure . uncurry displayCE
@@ -87,7 +88,7 @@ challengeCountdown = A
       CEMinute -> printf "One minute until Day %d challenge!" (dayInt d)
       CEStart  -> printf "Day %d challenge now online at %s !" (dayInt d) (displayLink yr d)
 
-eventCountdown :: MonadIO m => Alert m
+eventCountdown :: Applicative m => Alert m
 eventCountdown = A
     { aTrigger = pure . countdownEvent
     , aResp    = fmap (R "##elfbot-test" . T.pack) . pure . uncurry displayCE
@@ -99,7 +100,7 @@ eventCountdown = A
         (,y) <$> daysLeft
       where
         d        = localDay $ I.sup i
-        (y,_,_) = toGregorian d
+        (y,_,_)  = toGregorian d
         daysLeft = packFinite @14 $ (fromGregorian y 12 1 `diffDays` d) - 1
 
     displayCE d = printf "%d day%s left until Advent of Code %y!" n suff
@@ -107,6 +108,12 @@ eventCountdown = A
         n = getFinite d + 1
         suff | n == 1    = "" :: String
              | otherwise = "s"
+
+acknowledgeTick :: Applicative m => Alert m
+acknowledgeTick = A
+    { aTrigger = pure . Just
+    , aResp    = pure . R "##elfbot-test" . T.pack . show
+    }
 
 validYears :: Set Integer
 validYears = S.fromList [2015..2019]
