@@ -57,7 +57,7 @@ mergeBots = void . sequenceConduits
 data Command m = forall a. C
     { cName  :: Text
     , cHelp  :: Text
-    , cParse :: Message -> m (Maybe a)
+    , cParse :: Message -> m (Either Text a)
     , cResp  :: a -> m Text
     }
 
@@ -66,14 +66,16 @@ commandBot
     => Command m
     -> Bot m ()
 commandBot C{..} = C.concatMapM parseMe
-                .| C.mapM displayMe
+                .| C.mapM (uncurry displayMe)
   where
     parseMe = \case
       EMsg m
         | Just (_, "", rest) <- T.commonPrefixes ("!" <> cName <> " ") (mBody m <> " ")
-        -> fmap (mRoom m,) <$> cParse (m { mBody = T.strip rest })
+        -> Just . (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
-    displayMe (room, x) = R room <$> cResp x
+    displayMe room = \case
+      Left  e -> pure $ R room $ cName <> ": " <> e
+      Right r -> R room <$> cResp r
 
 helpBot
     :: Applicative m
@@ -82,19 +84,20 @@ helpBot
 helpBot cs = C
     { cName  = "help"
     , cHelp  = "Display list of commands and their usage instructions"
-    , cParse = \M{..} -> pure . Just $
+    , cParse = \M{..} -> pure $
         if mBody == ""
-          then Nothing
-          else Just . maybe (Left mBody) (Right . (mBody,)) $ M.lookup mBody cMap
+          then Right Nothing
+          else case M.lookup mBody cMap of
+                 Nothing -> Left  $ "Command not found: " <> mBody
+                 Just h  -> Right $ Just (mBody, h)
     , cResp  = pure . processHelp
     }
   where
     cMap = M.fromList [ (cName, cHelp) | C{..} <- cs ]
         <> M.singleton "help" "Display list of commands"
     processHelp = \case
-      Nothing      -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
-      Just (Left cmd) -> T.pack $ printf "Command not found: %s" (T.unpack cmd)
-      Just (Right (cmd, msg)) -> T.pack $ printf "%s: %s" (T.unpack cmd) (T.unpack msg)
+      Nothing         -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
+      Just (cmd, msg) -> T.pack $ printf "%s: %s" (T.unpack cmd) (T.unpack msg)
 
 -- | Like 'mergeBots' except adds help message
 commandBots

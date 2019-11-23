@@ -1,4 +1,5 @@
 {-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RecordWildCards           #-}
@@ -16,31 +17,32 @@ module Santabot (
   , acknowledgeTick
   ) where
 
-import           Advent                    as Advent
-import           Advent.API                as Advent
+import           Advent                     as Advent
+import           Advent.API                 as Advent
 import           Conduit
 import           Control.Monad
+import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
-import           Data.Map                  (Map)
+import           Data.Map                   (Map)
 import           Data.Maybe
-import           Data.Set                  (Set)
-import           Data.Time                 as Time
+import           Data.Set                   (Set)
+import           Data.Time                  as Time
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
 import           Servant.Links
 import           Text.Megaparsec
 import           Text.Printf
-import           Text.Read                 (readMaybe)
-import qualified Data.Duration             as DD
-import qualified Data.Map                  as M
-import qualified Data.Set                  as S
-import qualified Data.Text                 as T
-import qualified Numeric.Interval          as I
+import           Text.Read                  (readMaybe)
+import qualified Data.Duration              as DD
+import qualified Data.Map                   as M
+import qualified Data.Set                   as S
+import qualified Data.Text                  as T
+import qualified Numeric.Interval           as I
 
 
 puzzleLink :: MonadIO m => Command m
@@ -51,8 +53,8 @@ puzzleLink = C
     , cResp  = pure . T.pack . uncurry displayLink
     }
   where
-    askLink M{..} = runMaybeT $ do
-        day      <- maybe empty pure . listToMaybe . mapMaybe mkDay $ w
+    askLink M{..} = runExceptT $ do
+        day      <- maybe (throwE "No valid day given") pure . listToMaybe . mapMaybe mkDay $ w
         hasDays  <- M.keysSet . M.filter (S.member day) <$> liftIO allPuzzles
         let givenYear = find (`S.member` hasDays) w
             trueYear  = case givenYear of
@@ -75,7 +77,7 @@ nextPuzzle :: MonadIO m => Command m
 nextPuzzle = C
     { cName  = "next"
     , cHelp  = "Display the time until the next puzzle release."
-    , cParse = \_ -> pure $ Just ()
+    , cParse = \_ -> pure $ Right ()
     , cResp  = const printNext
     }
   where
