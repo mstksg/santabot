@@ -10,6 +10,8 @@ import qualified Data.Yaml    as Y
 
 data Conf = Conf
     { cChannels :: [String]
+    , cAlerts   :: String
+    , cTick     :: Int              -- ^ in seconds
     , cNick     :: String
     , cPassword :: Maybe String
     }
@@ -20,18 +22,14 @@ instance A.FromJSON Conf where
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
-targetRoom :: String
--- targetRoom = "##adventofcode"
-targetRoom = "##santabot-test"
-
-masterBot :: Bot IO ()
-masterBot = mergeBots
+masterBot :: String -> Bot IO ()
+masterBot alerts = mergeBots
   [ commandBots [puzzleLink, nextPuzzle]
-  , alertBot targetRoom challengeCountdown
-  , alertBot targetRoom eventCountdown
+  , alertBot alerts challengeCountdown
+  , alertBot alerts eventCountdown
   ]
 
 main :: IO ()
 main = do
     Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
-    launchIRC cChannels cNick cPassword 5000000 masterBot
+    launchIRC cChannels cNick cPassword (cTick * 1000000) (masterBot cAlerts)
