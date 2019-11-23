@@ -43,6 +43,7 @@ dependencies:
 - text
 - time
 - transformers
+- human-readable-duration
 
 library:
   source-dirs: src

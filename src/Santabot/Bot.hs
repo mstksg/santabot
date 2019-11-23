@@ -66,8 +66,8 @@ commandBot C{..} = C.concatMapM parseMe
   where
     parseMe = \case
       EMsg m
-        | Just (_, "", rest) <- T.commonPrefixes ("!" <> cName <> " ") (mBody m)
-        -> fmap (mRoom m,) <$> cParse (m { mBody = rest })
+        | Just (_, "", rest) <- T.commonPrefixes ("!" <> cName <> " ") (mBody m <> " ")
+        -> fmap (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
     displayMe (room, x) = R room <$> cResp x
 
