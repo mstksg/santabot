@@ -58,6 +58,23 @@ import qualified Data.Text.Encoding         as T
 import qualified Data.Yaml                  as Y
 import qualified Numeric.Interval           as I
 
+santaPhrases :: Set Text
+santaPhrases = S.fromList
+    [ "Ho ho ho!"
+    , "Deck the channels!"
+    , "Joy to the freenode!"
+    , "I just elfed myself!"
+    , "Have you been naughty or nice?"
+    , "Won't you guide my debugger tonight?"
+    , "Calling all reindeer!"
+    , "Run that checksum twice!"
+    , "Yule be in for a treat!"
+    , "Santa-plause, please."
+    , "Let it snow!"
+    , "Now Dasher, now Dancer!"
+    ]
+
+
 puzzleLink :: MonadIO m => Command m
 puzzleLink = C
     { cName  = "link"
@@ -147,7 +164,7 @@ challengeCountdown = A
           ]
         pick t e = guard (t `I.member` i) *> e
     displayCE (d, yr) = \case
-      CEHour   -> printf "Ho ho ho! One hour until Day %d challenge!" (dayInt d)
+      CEHour   -> printf "One hour until Day %d challenge!" (dayInt d)
       CETenMin -> printf "Ten minutes until Day %d challenge!" (dayInt d)
       CEMinute -> printf "One minute until Day %d challenge!" (dayInt d)
       CEStart  -> printf "Day %d challenge now online at %s !" (dayInt d) (displayLink yr d)
@@ -234,21 +251,6 @@ displayLink yr day = u
     rp :<|> _ = allLinks adventAPI yr
     rd :<|> _ = rp day
     u = showBaseUrl $ aocBase { baseUrlPath = show (linkURI rd) }
-
-santaPhrases :: Set Text
-santaPhrases = S.fromList
-    [ "Ho ho ho!"
-    , "Deck the channel!"
-    , "Joy to the freenode!"
-    , "I just elfed myself!"
-    , "Have you been naughty or nice?"
-    , "Won't you guide my debugger tonight?"
-    , "Calling all reindeer!"
-    , "Run that checksum twice!"
-    , "Yule be in for a treat!"
-    , "Santa-plause, please."
-    , "Let it snow!"
-    ]
 
 addSantaPhrase :: MonadIO m => Text -> m Text
 addSantaPhrase txt = liftIO $ do
