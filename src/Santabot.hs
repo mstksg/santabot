@@ -29,12 +29,12 @@ import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
+import           Data.Functor
 import           Data.Map                   (Map)
 import           Data.Maybe
 import           Data.Set                   (Set)
 import           Data.Text                  (Text)
 import           Data.Time                  as Time
-import           Network.HTTP.Client.TLS
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -42,12 +42,10 @@ import           Servant.Links
 import           Text.Megaparsec
 import           Text.Printf
 import           Text.Read                  (readMaybe)
-import           URI.ByteString
 import qualified Data.Duration              as DD
 import qualified Data.Map                   as M
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
 import qualified Numeric.Interval           as I
 
 
@@ -64,12 +62,10 @@ puzzleThread = C
     { cName  = "thread"
     , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!link 23, !link 2017 16).  Gives the most recent released puzzle of that day, unless a valid year is given."
     , cParse = askLink
-    , cResp  = \(y,d) -> liftIO $ do
-        mgr <- newTlsManager
-        m   <- getPostLinks mgr
-        pure $ case M.lookup d =<< M.lookup y m of
+    , cResp  = \(y,d) -> liftIO $
+        getPostLink y d <&> \case
           Nothing -> "Thread not available"
-          Just u  -> T.decodeUtf8 . serializeURIRef' $ u
+          Just u  -> T.pack u
     }
 
 askLink

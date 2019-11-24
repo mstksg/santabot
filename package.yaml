@@ -31,10 +31,15 @@ dependencies:
 library:
   source-dirs: src
   dependencies:
-  - advent-of-code-api
+  - advent-of-code-api >= 0.2.4.2
+  - aeson
+  - yaml
   - bytestring
   - conduit
   - containers
+  - deepseq
+  - directory
+  - filepath
   - finite-typelits
   - http-client
   - http-client-tls

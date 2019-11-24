@@ -5,9 +5,12 @@
 
 module Advent.Reddit (
     getPostLinks
+  , cachedPostLinks
+  , getPostLink
   ) where
 
 import           Advent
+import           Advent.Cache
 import           Control.Monad
 import           Control.Monad.Combinators
 import           Data.Char
@@ -17,6 +20,8 @@ import           Data.Maybe
 import           Data.Text                  (Text)
 import           Data.Void
 import           Network.HTTP.Client
+import           Network.HTTP.Client.TLS
+import           System.Directory
 import           Text.HTML.TagSoup.Tree     (TagTree(..))
 import           Text.Megaparsec
 import           URI.ByteString
@@ -25,11 +30,37 @@ import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.Map                   as M
 import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
+import qualified Data.Yaml                  as Y
 import qualified Text.HTML.TagSoup.Tree     as T
 import qualified Text.Megaparsec.Char.Lexer as P
 
-getPostLinks :: Manager -> IO (Map Integer (Map Day URI))
-getPostLinks = fmap ( parsePostLinks
+getPostLink :: Integer -> Day -> IO (Maybe String)
+getPostLink y d = do
+    mp <- cachedPostLinks
+    case M.lookup d =<< M.lookup y mp of
+      Nothing -> do
+        removeFile cachePath
+        mp' <- cachedPostLinks
+        pure $ M.lookup d =<< M.lookup y mp'
+      Just u  -> pure $ Just u
+
+cachedPostLinks :: IO (Map Integer (Map Day String))
+cachedPostLinks = cacheing cachePath sl $
+    getPostLinks =<< newTlsManager
+  where
+    sl = SL
+      { _slSave = Just . T.decodeUtf8 . Y.encode
+      , _slLoad = either (const Nothing) Just
+                . Y.decodeEither'
+                . T.encodeUtf8
+      }
+
+cachePath :: FilePath
+cachePath = "cache/postlinks.yaml"
+
+getPostLinks :: Manager -> IO (Map Integer (Map Day String))
+getPostLinks = fmap ( (fmap . fmap) (T.unpack . T.decodeUtf8 . serializeURIRef')
+                    . parsePostLinks
                     . T.decodeUtf8
                     . BSL.toStrict
                     . responseBody

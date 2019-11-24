@@ -5,19 +5,26 @@
 
 packages:
 - completed:
-    hackage: advent-of-code-api-0.2.4.1@sha256:94557df504f0e50fbeb4c51fbf28ea5dd3bed4a829e5678f83bbe5c5765449d9,2327
-    pantry-tree:
-      size: 1185
-      sha256: b986e28e0a8d028222b0a502386065585ed9b50f8441ade13d73e378b2d909bc
-  original:
-    hackage: advent-of-code-api-0.2.4.1
-- completed:
     hackage: simpleirc-0.3.1@sha256:f2103c759d55013db3a4d1a62de253af909d96ced9dd7eb3db10dc081f8525c4,1344
     pantry-tree:
       size: 403
       sha256: f371a22e37a3f39d7a8d70be9eb51343b57092948cb25155c286085b788cefa0
   original:
     hackage: simpleirc-0.3.1
+- completed:
+    size: 21708
+    url: https://github.com/mstksg/advent-of-code-api/archive/b239304e496ba5abbe3034e10d300b18df91ca7e.tar.gz
+    cabal-file:
+      size: 2327
+      sha256: 9a22b7d8657ec071d1bc01bf48a8091942b64871a8bb3bfaab137d52c563b87f
+    name: advent-of-code-api
+    version: 0.2.4.2
+    sha256: 97c9a70af263cec77b4265edd7e153ed962ce1d19516cfd82b47102bfb4d94e9
+    pantry-tree:
+      size: 1450
+      sha256: c65485f2017bc5cbaf4ba9ee371d12ad01c80f0697a5d87e7c187663e9b15d6c
+  original:
+    url: https://github.com/mstksg/advent-of-code-api/archive/b239304e496ba5abbe3034e10d300b18df91ca7e.tar.gz
 snapshots:
 - completed:
     size: 421719
