@@ -20,7 +20,6 @@ import           Santabot.Bot
 import qualified Data.Conduit.Combinators        as C
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
-import qualified Data.Text.IO                    as T
 
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
@@ -77,13 +76,8 @@ launchIRC channels nick pwd tick bot = do
     runConduit $ sourceTBMQueue eventQueue
               .| bot
               .| C.map respCommand
-              -- .| C.iterM logResp
               .| C.mapM_ (sendCmd irc)
               .| C.sinkNull
-
--- logResp :: IRC.Command -> IO ()
--- logResp cmd = T.putStrLn $
---     "[SENT] " <> T.decodeUtf8 (showCommand cmd)
 
 respCommand :: Resp -> IRC.Command
 respCommand R{..} = case rType of

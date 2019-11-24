@@ -22,24 +22,23 @@ module Santabot (
   ) where
 
 import           Advent
-import           Advent.API                 as Advent
+import           Advent.API                as Advent
 import           Advent.Cache
 import           Advent.Reddit
 import           Advent.Types
 import           Conduit
 import           Control.Monad
-import           Control.Monad.Trans.Except
 import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
 import           Data.Functor
-import           Data.Map                   (Map)
+import           Data.Map                  (Map)
 import           Data.Maybe
-import           Data.Set                   (Set)
-import           Data.Text                  (Text)
-import           Data.Time                  as Time
+import           Data.Set                  (Set)
+import           Data.Text                 (Text)
+import           Data.Time                 as Time
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -49,14 +48,14 @@ import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
 import           Text.Printf
-import           Text.Read                  (readMaybe)
-import qualified Data.Duration              as DD
-import qualified Data.Map                   as M
-import qualified Data.Set                   as S
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Yaml                  as Y
-import qualified Numeric.Interval           as I
+import           Text.Read                 (readMaybe)
+import qualified Data.Duration             as DD
+import qualified Data.Map                  as M
+import qualified Data.Set                  as S
+import qualified Data.Text                 as T
+import qualified Data.Text.Encoding        as T
+import qualified Data.Yaml                 as Y
+import qualified Numeric.Interval          as I
 
 santaPhrases :: Set Text
 santaPhrases = S.fromList
@@ -102,34 +101,38 @@ santaPhrases = S.fromList
 puzzleLink :: MonadIO m => Command m
 puzzleLink = C
     { cName  = "link"
-    , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  Gives the most recent released puzzle of that day, unless a valid year is given."
-    , cParse = askLink
+    , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  If bad day or year given, just returns most recent match."
+    , cParse = fmap Right . askLink
     , cResp  = pure . T.pack . uncurry displayLink
     }
 
 puzzleThread :: MonadIO m => Command m
 puzzleThread = C
     { cName  = "thread"
-    , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!link 23, !link 2017 16).  Gives the most recent released puzzle of that day, unless a valid year is given."
-    , cParse = askLink
+    , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!thread 23, !thread 2017 16).  If bad day or year given, just returns most recent match."
+    , cParse = fmap Right . askLink
     , cResp  = \(y,d) -> liftIO $
         getPostLink y d <&> \case
           Nothing -> "Thread not available, sorry!"
           Just u  -> T.pack $ printf "[%d Day %d] %s" y (dayInt d) u
     }
 
+-- TODO: make this just return the current day's puzzle, if it exists.
 askLink
     :: MonadIO m
     => Message
-    -> m (Either Text (Integer, Advent.Day))
-askLink M{..} = runExceptT $ do
-    day      <- maybe (throwE "No valid day given") pure . listToMaybe . mapMaybe mkDay $ w
-    hasDays  <- M.keysSet . M.filter (S.member day) <$> liftIO allPuzzles
-    let givenYear = find (`S.member` hasDays) w
-        trueYear  = case givenYear of
-          Just k | k `S.member` hasDays -> k
-          _                             -> S.findMax hasDays
-    pure (trueYear, day)
+    -> m (Integer, Advent.Day)
+askLink M{..} = do
+    allP <- liftIO allPuzzles
+    pure $ case listToMaybe (mapMaybe mkDay w) of
+      Nothing  -> M.findMax . fmap maximum $ allP
+      Just day ->
+        let hasDays  = M.keysSet . M.filter (S.member day) $ allP
+            givenYear = find (`S.member` hasDays) w
+            trueYear  = case givenYear of
+              Just k | k `S.member` hasDays -> k
+              _                             -> S.findMax hasDays
+        in  (trueYear, day)
   where
     w = mapMaybe (readMaybe . T.unpack) . T.words . T.map clear $ mBody
     clear c
