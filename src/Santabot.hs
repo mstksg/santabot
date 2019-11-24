@@ -115,7 +115,7 @@ puzzleThread = C
     , cResp  = \(y,d) -> liftIO $
         getPostLink y d <&> \case
           Nothing -> "Thread not available, sorry!"
-          Just u  -> T.pack $ printf "%d day %d: %s" y (dayInt d) u
+          Just u  -> T.pack $ printf "[%d Day %d] %s" y (dayInt d) u
     }
 
 askLink
