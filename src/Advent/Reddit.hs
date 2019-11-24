@@ -44,14 +44,17 @@ checkUncapped u = fmap isJust . runMaybeT $ do
     guard $ "capped" `T.isInfixOf` T.map toLower t
 
 getPostLink :: Integer -> Day -> IO (Maybe String)
-getPostLink y d = do
-    mp <- cachedPostLinks
+getPostLink y d = runMaybeT $ do
+    guard =<< liftIO (challengeReleased y d)
+    mp <- liftIO cachedPostLinks
     case M.lookup d =<< M.lookup y mp of
       Nothing -> do
-        removeFile cachePath
-        mp' <- cachedPostLinks
-        pure $ M.lookup d =<< M.lookup y mp'
-      Just u  -> pure $ Just u
+        mp' <- liftIO $ do
+          removeFile cachePath
+          cachedPostLinks
+        maybe empty pure $
+          M.lookup d =<< M.lookup y mp'
+      Just u  -> pure u
 
 cachedPostLinks :: IO (Map Integer (Map Day String))
 cachedPostLinks = cacheing cachePath sl $
