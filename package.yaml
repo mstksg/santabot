@@ -33,7 +33,6 @@ library:
   dependencies:
   - advent-of-code-api >= 0.2.4.2
   - aeson
-  - yaml
   - bytestring
   - conduit
   - containers
@@ -47,6 +46,7 @@ library:
   - intervals
   - megaparsec
   - parser-combinators
+  - random
   - servant
   - servant-client
   - servant-client-core
@@ -59,6 +59,7 @@ library:
   - time
   - transformers
   - uri-bytestring
+  - yaml
 
 executables:
   santabot:

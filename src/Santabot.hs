@@ -17,6 +17,8 @@ module Santabot (
   , eventCountdown
   , boardCapped
   , acknowledgeTick
+  , santaPhrases
+  , addSantaPhrase
   ) where
 
 import           Advent
@@ -44,6 +46,7 @@ import           Servant.Client.Core
 import           Servant.Links
 import           System.Directory
 import           System.FilePath
+import           System.Random
 import           Text.Megaparsec
 import           Text.Printf
 import           Text.Read                  (readMaybe)
@@ -54,7 +57,6 @@ import qualified Data.Text                  as T
 import qualified Data.Text.Encoding         as T
 import qualified Data.Yaml                  as Y
 import qualified Numeric.Interval           as I
-
 
 puzzleLink :: MonadIO m => Command m
 puzzleLink = C
@@ -71,7 +73,7 @@ puzzleThread = C
     , cParse = askLink
     , cResp  = \(y,d) -> liftIO $
         getPostLink y d <&> \case
-          Nothing -> "Thread not available"
+          Nothing -> "Thread not available, sorry!"
           Just u  -> T.pack u
     }
 
@@ -107,7 +109,7 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
         dur       = realToFrac $ nextTime `diffLocalTime` t
         durString = T.unpack . T.strip . T.pack
                   $ DD.humanReadableDuration dur
-    pure . T.pack $ printf
+    addSantaPhrase . T.pack $ printf
       "Next puzzle (%d Day %d) will be released in %s."
       y
       (dayInt d)
@@ -127,7 +129,7 @@ data ChallengeEvent = CEHour
 challengeCountdown :: MonadIO m => Alert m
 challengeCountdown = A
     { aTrigger = pure . challengeEvent
-    , aResp    = pure . T.pack . uncurry displayCE
+    , aResp    = addSantaPhrase . T.pack . uncurry displayCE
     }
   where
     challengeEvent i = do
@@ -153,7 +155,7 @@ challengeCountdown = A
 eventCountdown :: MonadIO m => Alert m
 eventCountdown = A
     { aTrigger = pure . countdownEvent
-    , aResp    = pure . T.pack . uncurry displayCE
+    , aResp    = addSantaPhrase . T.pack . uncurry displayCE
     }
   where
     countdownEvent i = do
@@ -178,7 +180,7 @@ data CapState = CSEmpty     -- ^ file not even made yet
 boardCapped :: MonadIO m => Alert m
 boardCapped = A
     { aTrigger = risingEdge
-    , aResp    = uncurry sendEdge
+    , aResp    = addSantaPhrase <=< uncurry sendEdge
     }
   where
     logDir = "cache/capped"
@@ -205,7 +207,7 @@ boardCapped = A
                        . utcToLocalTime (read "EST")
                      <$> finalTime
             timeString' = either (const "") id timeString
-        pure . T.pack $ printf "Leaderboard is now capped %s(%s)" timeString' linkUrl
+        pure . T.pack $ printf "Leaderboard for Day %d is now capped %s(%s)!" (dayInt d) timeString' linkUrl
       where
     getCapState l = readFileMaybe l <&> \case
       Nothing -> CSEmpty
@@ -232,3 +234,25 @@ displayLink yr day = u
     rp :<|> _ = allLinks adventAPI yr
     rd :<|> _ = rp day
     u = showBaseUrl $ aocBase { baseUrlPath = show (linkURI rd) }
+
+santaPhrases :: Set Text
+santaPhrases = S.fromList
+    [ "Ho ho ho!"
+    , "Deck the channel!"
+    , "Joy to the freenode!"
+    , "I just elfed myself!"
+    , "Have you been naughty or nice?"
+    , "Won't you guide my debugger tonight?"
+    , "Calling all reindeer!"
+    , "Run that checksum twice!"
+    , "Yule be in for a treat!"
+    , "Santa-plause, please."
+    , "Let it snow!"
+    ]
+
+addSantaPhrase :: MonadIO m => Text -> m Text
+addSantaPhrase txt = liftIO $ do
+    pick <- (`S.elemAt` santaPhrases)
+        <$> randomRIO (0, S.size santaPhrases - 1)
+    pure $ pick <> " " <> txt
+
