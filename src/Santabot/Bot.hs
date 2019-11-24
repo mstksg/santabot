@@ -4,9 +4,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE TupleSections             #-}
-{-# LANGUAGE TypeApplications          #-}
 {-# LANGUAGE TypeInType                #-}
-{-# LANGUAGE ViewPatterns              #-}
 
 module Santabot.Bot (
     Message(..)

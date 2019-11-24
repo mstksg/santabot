@@ -32,14 +32,14 @@ library:
   source-dirs: src
   dependencies:
   - advent-of-code-api
+  - bytestring
   - conduit
   - containers
-  - bytestring
   - finite-typelits
   - http-client
+  - http-client-tls
   - human-readable-duration
   - intervals
-  - megaparsec
   - megaparsec
   - parser-combinators
   - servant

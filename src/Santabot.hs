@@ -11,14 +11,16 @@
 
 module Santabot (
     puzzleLink
+  , puzzleThread
   , nextPuzzle
   , challengeCountdown
   , eventCountdown
   , acknowledgeTick
   ) where
 
-import           Advent                     as Advent
+import           Advent
 import           Advent.API                 as Advent
+import           Advent.Reddit
 import           Conduit
 import           Control.Monad
 import           Control.Monad.Trans.Except
@@ -30,7 +32,9 @@ import           Data.Foldable
 import           Data.Map                   (Map)
 import           Data.Maybe
 import           Data.Set                   (Set)
+import           Data.Text                  (Text)
 import           Data.Time                  as Time
+import           Network.HTTP.Client.TLS
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -52,20 +56,37 @@ puzzleLink = C
     , cParse = askLink
     , cResp  = pure . T.pack . uncurry displayLink
     }
+
+puzzleThread :: MonadIO m => Command m
+puzzleThread = C
+    { cName  = "link"
+    , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!link 23, !link 2017 16).  Gives the most recent released puzzle of that day, unless a valid year is given."
+    , cParse = askLink
+    , cResp  = \(y,d) -> liftIO $ do
+        mgr <- newTlsManager
+        m   <- getPostLinks mgr
+        pure $ case M.lookup d =<< M.lookup y m of
+          Nothing -> "Thread not available"
+          Just u  -> T.pack $ show u
+    }
+
+askLink
+    :: MonadIO m
+    => Message
+    -> m (Either Text (Integer, Advent.Day))
+askLink M{..} = runExceptT $ do
+    day      <- maybe (throwE "No valid day given") pure . listToMaybe . mapMaybe mkDay $ w
+    hasDays  <- M.keysSet . M.filter (S.member day) <$> liftIO allPuzzles
+    let givenYear = find (`S.member` hasDays) w
+        trueYear  = case givenYear of
+          Just k | k `S.member` hasDays -> k
+          _                             -> S.findMax hasDays
+    pure (trueYear, day)
   where
-    askLink M{..} = runExceptT $ do
-        day      <- maybe (throwE "No valid day given") pure . listToMaybe . mapMaybe mkDay $ w
-        hasDays  <- M.keysSet . M.filter (S.member day) <$> liftIO allPuzzles
-        let givenYear = find (`S.member` hasDays) w
-            trueYear  = case givenYear of
-              Just k | k `S.member` hasDays -> k
-              _                             -> S.findMax hasDays
-        pure (trueYear, day)
-      where
-        w = mapMaybe (readMaybe . T.unpack) . T.words . T.map clear $ mBody
-        clear c
-          | isDigit c = c
-          | otherwise = ' '
+    w = mapMaybe (readMaybe . T.unpack) . T.words . T.map clear $ mBody
+    clear c
+      | isDigit c = c
+      | otherwise = ' '
 
 allPuzzles :: IO (Map Integer (Set Advent.Day))
 allPuzzles = do

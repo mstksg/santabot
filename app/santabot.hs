@@ -27,6 +27,7 @@ masterBot :: String -> Bot IO ()
 masterBot alerts = mergeBots
   [ commandBots
       [ puzzleLink
+      , puzzleThread
       , nextPuzzle
       , simpleCommand "about" "Information about santabot" . pure $
           "Helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
