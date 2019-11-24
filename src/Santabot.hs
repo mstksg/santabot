@@ -166,7 +166,7 @@ eventCountdown = A
         (y,_,_)  = toGregorian d
         daysLeft = packFinite @14 $ (fromGregorian y 12 1 `diffDays` d) - 1
 
-    displayCE d = printf "%d day%s left until Advent of Code %y!" n suff
+    displayCE d = printf "%d day%s left until Advent of Code %d!" n suff
       where
         n = getFinite d + 1
         suff | n == 1    = "" :: String

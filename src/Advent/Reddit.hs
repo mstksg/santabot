@@ -20,6 +20,7 @@ import           Network.HTTP.Client
 import           Text.HTML.TagSoup.Tree     (TagTree(..))
 import           Text.Megaparsec
 import           URI.ByteString
+import qualified Data.Aeson                 as J
 import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.Map                   as M
 import qualified Data.Text                  as T
