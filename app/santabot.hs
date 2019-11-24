@@ -30,7 +30,7 @@ masterBot alerts = mergeBots
       , puzzleThread
       , nextPuzzle
       , simpleCommand "about" "Information about santabot" . addSantaPhrase $
-          "Helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
+          "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
       , simpleCommand "leaderboard" "IRC leaderboard" . addSantaPhrase $
           "Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/2018/leaderboard/private/view/382266."
       ]
