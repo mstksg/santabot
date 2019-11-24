@@ -7,6 +7,7 @@ module Advent.Reddit (
     getPostLinks
   , cachedPostLinks
   , getPostLink
+  , checkUncapped
   ) where
 
 import           Advent
@@ -33,6 +34,15 @@ import qualified Data.Text.Encoding         as T
 import qualified Data.Yaml                  as Y
 import qualified Text.HTML.TagSoup.Tree     as T
 import qualified Text.Megaparsec.Char.Lexer as P
+
+checkUncapped :: String -> IO Bool
+checkUncapped u = do
+    Just req <- pure $ parseRequest u
+    mgr <- newTlsManager
+    t <- T.map toLower . T.decodeUtf8 . BSL.toStrict . responseBody <$> httpLbs req mgr
+    pure $ "capped" `T.isInfixOf` t
+                
+
 
 getPostLink :: Integer -> Day -> IO (Maybe String)
 getPostLink y d = do

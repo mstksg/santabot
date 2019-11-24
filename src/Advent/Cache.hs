@@ -16,6 +16,7 @@ module Advent.Cache (
     cacheing
   , SaverLoader(..)
   , noCache
+  , readFileMaybe
   ) where
 
 import           Control.DeepSeq
