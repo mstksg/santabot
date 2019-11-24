@@ -14,6 +14,8 @@ import           Advent
 import           Advent.Cache
 import           Control.Monad
 import           Control.Monad.Combinators
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Maybe
 import           Data.Char
 import           Data.Foldable
 import           Data.Map                   (Map)
@@ -26,7 +28,6 @@ import           System.Directory
 import           Text.HTML.TagSoup.Tree     (TagTree(..))
 import           Text.Megaparsec
 import           URI.ByteString
-import qualified Data.Aeson                 as J
 import qualified Data.ByteString.Lazy       as BSL
 import qualified Data.Map                   as M
 import qualified Data.Text                  as T
@@ -36,13 +37,11 @@ import qualified Text.HTML.TagSoup.Tree     as T
 import qualified Text.Megaparsec.Char.Lexer as P
 
 checkUncapped :: String -> IO Bool
-checkUncapped u = do
-    Just req <- pure $ parseRequest u
-    mgr <- newTlsManager
-    t <- T.map toLower . T.decodeUtf8 . BSL.toStrict . responseBody <$> httpLbs req mgr
-    pure $ "capped" `T.isInfixOf` t
-                
-
+checkUncapped u = fmap isJust . runMaybeT $ do
+    Just req <- pure   $ parseRequest u
+    mgr      <- liftIO newTlsManager
+    Right t  <- T.decodeUtf8' . BSL.toStrict . responseBody <$> liftIO (httpLbs req mgr)
+    guard $ "capped" `T.isInfixOf` T.map toLower t
 
 getPostLink :: Integer -> Day -> IO (Maybe String)
 getPostLink y d = do

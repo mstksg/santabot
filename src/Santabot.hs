@@ -23,6 +23,7 @@ import           Advent
 import           Advent.API                 as Advent
 import           Advent.Cache
 import           Advent.Reddit
+import           Advent.Types
 import           Conduit
 import           Control.Monad
 import           Control.Monad.Trans.Except
@@ -46,7 +47,6 @@ import           System.FilePath
 import           Text.Megaparsec
 import           Text.Printf
 import           Text.Read                  (readMaybe)
-import           URI.ByteString
 import qualified Data.Duration              as DD
 import qualified Data.Map                   as M
 import qualified Data.Set                   as S
@@ -193,15 +193,20 @@ boardCapped = A
           CSNeg   -> do
             u  <- MaybeT . liftIO $ getPostLink yy d'
             guard =<< liftIO (checkUncapped u)
-            pure (u, (logFP, i))
+            pure (u, (logFP, (yy, d')))
       where
         d          = localDay i
         (yy,mm,dd) = toGregorian d
-    sendEdge linkUrl (logFP, t) = do
-        liftIO $ Y.encodeFile logFP True
-        pure . T.pack $ printf "Leaderboard is now capped at %s EST (%s)" timeString linkUrl
+    sendEdge linkUrl (logFP, (y, d)) = liftIO $ do
+        Y.encodeFile logFP True
+        lb <- runAoC (defaultAoCOpts y"") $ AoCDailyLeaderboard d
+        let finalTime  = maximum . map dlbmTime . toList . dlbStar2 <$> lb
+            timeString = formatTime defaultTimeLocale "at %H:%M:%S EST "
+                       . utcToLocalTime (read "EST")
+                     <$> finalTime
+            timeString' = either (const "") id timeString
+        pure . T.pack $ printf "Leaderboard is now capped %s(%s)" timeString' linkUrl
       where
-        timeString = formatTime defaultTimeLocale "%H:%M:%S" t
     getCapState l = readFileMaybe l <&> \case
       Nothing -> CSEmpty
       Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
