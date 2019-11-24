@@ -5,6 +5,13 @@
 
 packages:
 - completed:
+    hackage: advent-of-code-api-0.2.4.1@sha256:94557df504f0e50fbeb4c51fbf28ea5dd3bed4a829e5678f83bbe5c5765449d9,2327
+    pantry-tree:
+      size: 1185
+      sha256: b986e28e0a8d028222b0a502386065585ed9b50f8441ade13d73e378b2d909bc
+  original:
+    hackage: advent-of-code-api-0.2.4.1
+- completed:
     hackage: simpleirc-0.3.1@sha256:f2103c759d55013db3a4d1a62de253af909d96ced9dd7eb3db10dc081f8525c4,1344
     pantry-tree:
       size: 403

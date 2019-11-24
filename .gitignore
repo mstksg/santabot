@@ -1,4 +1,5 @@
 .stack-work/
 santabot.cabal
 santabot-conf.yaml
+data/wikitest.md
 *~

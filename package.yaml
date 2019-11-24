@@ -26,27 +26,34 @@ ghc-options:
 - -Werror=incomplete-patterns
 
 dependencies:
-- advent-of-code-api
 - base >= 4.7 && < 5
-- conduit
-- containers
-- finite-typelits
-- intervals
-- megaparsec
-- servant
-- servant-client
-- servant-client-core
-- simpleirc
-- stm
-- stm-chans
-- stm-conduit
-- text
-- time
-- transformers
-- human-readable-duration
 
 library:
   source-dirs: src
+  dependencies:
+  - advent-of-code-api
+  - conduit
+  - containers
+  - bytestring
+  - finite-typelits
+  - http-client
+  - human-readable-duration
+  - intervals
+  - megaparsec
+  - megaparsec
+  - parser-combinators
+  - servant
+  - servant-client
+  - servant-client-core
+  - simpleirc
+  - stm
+  - stm-chans
+  - stm-conduit
+  - tagsoup
+  - text
+  - time
+  - transformers
+  - uri-bytestring
 
 executables:
   santabot:
