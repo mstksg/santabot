@@ -60,7 +60,7 @@ mergeBots :: Monad m => [Bot m ()] -> Bot m ()
 mergeBots = void . sequenceConduits
 
 data Command m = forall a. C
-    { cName  :: Text
+    { cName  :: String
     , cHelp  :: Text
     , cParse :: Message -> m (Either Text a)
     , cResp  :: a -> m Text
@@ -75,11 +75,13 @@ commandBot C{..} = C.concatMapM parseMe
   where
     parseMe = \case
       EMsg m
-        | Just (_, "", rest) <- T.commonPrefixes ("!" <> cName <> " ") (mBody m <> " ")
+        | Just (_, "", rest) <- T.commonPrefixes ("!" <> T.pack cName <> " ") (mBody m <> " ")
         -> Just . (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
     displayMe room = \case
-      Left  e -> pure $ R room RTMessage $ cName <> ": " <> e
+      Left  e -> pure . R room RTMessage . T.pack $
+        printf "%s: %s (!help %s for help)"
+          cName (T.unpack e) cName
       Right r -> R room RTMessage <$> cResp r
 
 helpBot
@@ -98,7 +100,7 @@ helpBot cs = C
     , cResp  = pure . processHelp
     }
   where
-    cMap = M.fromList [ (cName, cHelp) | C{..} <- cs ]
+    cMap = M.fromList [ (T.pack cName, cHelp) | C{..} <- cs ]
         <> M.singleton "help" "Display list of commands"
     processHelp = \case
       Nothing         -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
@@ -106,7 +108,7 @@ helpBot cs = C
 
 simpleCommand
     :: Applicative m
-    => Text             -- ^ trigger
+    => String           -- ^ trigger
     -> Text             -- ^ help
     -> m Text           -- ^ response
     -> Command m
