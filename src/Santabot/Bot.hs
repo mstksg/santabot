@@ -10,6 +10,7 @@
 
 module Santabot.Bot (
     Message(..)
+  , RespType(..)
   , Event(..)
   , Resp(..)
   , Bot
@@ -45,7 +46,12 @@ data Event = ETick LocalTime            -- ^ time for AoC servers
            | EMsg  Message
   deriving Show
 
+data RespType = RTMessage
+              | RTAction
+  deriving Show
+
 data Resp = R { rRoom :: String
+              , rType :: RespType
               , rBody :: Text
               }
   deriving Show
@@ -75,8 +81,8 @@ commandBot C{..} = C.concatMapM parseMe
         -> Just . (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
     displayMe room = \case
-      Left  e -> pure $ R room $ cName <> ": " <> e
-      Right r -> R room <$> cResp r
+      Left  e -> pure $ R room RTMessage $ cName <> ": " <> e
+      Right r -> R room RTMessage <$> cResp r
 
 helpBot
     :: Applicative m
@@ -133,7 +139,7 @@ alertBot
 alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
                 .| consecs
                 .| C.concatMapM aTrigger
-                .| C.mapM (fmap (R c) . aResp)
+                .| C.mapM (fmap (R c RTAction) . aResp)
   where
     consecs = do
         x0 <- await

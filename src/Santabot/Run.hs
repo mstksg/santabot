@@ -15,16 +15,22 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Maybe
 import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
-import           Network.SimpleIRC
+import           Network.SimpleIRC               as IRC
 import           Santabot.Bot
-import           System.IO
 import qualified Data.Conduit.Combinators        as C
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
+import qualified Data.Text.IO                    as T
 
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
-ircConf :: [String] -> String -> Maybe String -> MVar () -> TBMQueue Event -> IrcConfig
+ircConf
+    :: [String]
+    -> String
+    -> Maybe String
+    -> MVar ()
+    -> TBMQueue Event
+    -> IrcConfig
 ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
       { cChannels = channels
       , cPass     = pwd
@@ -60,9 +66,6 @@ launchIRC channels nick pwd tick bot = do
 
     Right irc <- connect (ircConf channels nick pwd started eventQueue) True True
 
-    let sendResp R{..} = sendMsg irc (T.encodeUtf8 $ T.pack rRoom)
-                                     (T.encodeUtf8 $ " " <> rBody)
-
     _ <- forkIO $ do
       () <- takeMVar started
       threadDelay 5000000
@@ -73,9 +76,19 @@ launchIRC channels nick pwd tick bot = do
 
     runConduit $ sourceTBMQueue eventQueue
               .| bot
+              .| C.map respCommand
               .| C.iterM logResp
-              .| C.mapM_ sendResp
+              .| C.mapM_ (sendCmd irc)
               .| C.sinkNull
 
-logResp :: Resp -> IO ()
-logResp = hPrint stderr
+logResp :: IRC.Command -> IO ()
+logResp cmd = T.putStrLn $
+    "[SENT] " <> T.decodeUtf8 (showCommand cmd)
+
+respCommand :: Resp -> IRC.Command
+respCommand R{..} = case rType of
+    RTMessage -> MPrivmsg rm msg
+    RTAction  -> MAction  rm msg
+  where
+    rm  = T.encodeUtf8 . T.pack $ rRoom
+    msg = T.encodeUtf8 $ " " <> rBody

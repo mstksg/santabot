@@ -123,7 +123,7 @@ challengeCountdown = A
           ]
         pick t e = guard (t `I.member` i) *> e
     displayCE (d, yr) = \case
-      CEHour   -> printf "One hour until Day %d challenge!" (dayInt d)
+      CEHour   -> printf "Ho ho ho! One hour until Day %d challenge!" (dayInt d)
       CETenMin -> printf "Ten minutes until Day %d challenge!" (dayInt d)
       CEMinute -> printf "One minute until Day %d challenge!" (dayInt d)
       CEStart  -> printf "Day %d challenge now online at %s !" (dayInt d) (displayLink yr d)
