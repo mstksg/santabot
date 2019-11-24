@@ -22,7 +22,7 @@ module Santabot (
   ) where
 
 import           Advent
-import           Advent.API                as Advent
+import           Advent.API                 as Advent
 import           Advent.Cache
 import           Advent.Reddit
 import           Advent.Types
@@ -34,11 +34,11 @@ import           Data.Char
 import           Data.Finite
 import           Data.Foldable
 import           Data.Functor
-import           Data.Map                  (Map)
+import           Data.Map                   (Map)
 import           Data.Maybe
-import           Data.Set                  (Set)
-import           Data.Text                 (Text)
-import           Data.Time                 as Time
+import           Data.Set                   (Set)
+import           Data.Text                  (Text)
+import           Data.Time                  as Time
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -48,14 +48,14 @@ import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
 import           Text.Printf
-import           Text.Read                 (readMaybe)
-import qualified Data.Duration             as DD
-import qualified Data.Map                  as M
-import qualified Data.Set                  as S
-import qualified Data.Text                 as T
-import qualified Data.Text.Encoding        as T
-import qualified Data.Yaml                 as Y
-import qualified Numeric.Interval          as I
+import           Text.Read                  (readMaybe)
+import qualified Data.Duration              as DD
+import qualified Data.Map                   as M
+import qualified Data.Set                   as S
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as T
+import qualified Data.Yaml                  as Y
+import qualified Numeric.Interval           as I
 
 santaPhrases :: Set Text
 santaPhrases = S.fromList
@@ -102,7 +102,7 @@ puzzleLink :: MonadIO m => Command m
 puzzleLink = C
     { cName  = "link"
     , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  If bad day or year given, just returns most recent match."
-    , cParse = fmap Right . askLink
+    , cParse = askLink
     , cResp  = pure . T.pack . uncurry displayLink
     }
 
@@ -110,7 +110,7 @@ puzzleThread :: MonadIO m => Command m
 puzzleThread = C
     { cName  = "thread"
     , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!thread 23, !thread 2017 16).  If bad day or year given, just returns most recent match."
-    , cParse = fmap Right . askLink
+    , cParse = askLink
     , cResp  = \(y,d) -> liftIO $
         getPostLink y d <&> \case
           Nothing -> "Thread not available, sorry!"
@@ -121,12 +121,19 @@ puzzleThread = C
 askLink
     :: MonadIO m
     => Message
-    -> m (Integer, Advent.Day)
+    -> m (Either Text (Integer, Advent.Day))
 askLink M{..} = do
     allP <- liftIO allPuzzles
-    pure $ case listToMaybe (mapMaybe mkDay w) of
-      Nothing  -> M.findMax . fmap maximum $ allP
-      Just day ->
+    case listToMaybe (mapMaybe mkDay w) of
+      Nothing  -> do
+        (y, m, d) <- toGregorian . localDay <$> liftIO aocTime
+        case mkDay (fromIntegral d) of
+          Just dd
+            | m == 12
+            , dd `S.member` fold (M.lookup y allP)
+            -> pure $ Right (y, dd)
+          _ -> pure $ Left "No valid day found."
+      Just day -> pure . Right $
         let hasDays  = M.keysSet . M.filter (S.member day) $ allP
             givenYear = find (`S.member` hasDays) w
             trueYear  = case givenYear of
