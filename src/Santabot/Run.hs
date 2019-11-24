@@ -77,13 +77,13 @@ launchIRC channels nick pwd tick bot = do
     runConduit $ sourceTBMQueue eventQueue
               .| bot
               .| C.map respCommand
-              .| C.iterM logResp
+              -- .| C.iterM logResp
               .| C.mapM_ (sendCmd irc)
               .| C.sinkNull
 
-logResp :: IRC.Command -> IO ()
-logResp cmd = T.putStrLn $
-    "[SENT] " <> T.decodeUtf8 (showCommand cmd)
+-- logResp :: IRC.Command -> IO ()
+-- logResp cmd = T.putStrLn $
+--     "[SENT] " <> T.decodeUtf8 (showCommand cmd)
 
 respCommand :: Resp -> IRC.Command
 respCommand R{..} = case rType of
