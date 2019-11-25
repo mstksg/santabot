@@ -32,7 +32,6 @@ library:
   source-dirs: src
   dependencies:
   - advent-of-code-api >= 0.2.4.2
-  - aeson
   - bytestring
   - conduit
   - containers
@@ -48,7 +47,6 @@ library:
   - parser-combinators
   - random
   - servant
-  - servant-client
   - servant-client-core
   - simpleirc
   - stm
@@ -56,6 +54,7 @@ library:
   - stm-conduit
   - tagsoup
   - text
+  - th-printf
   - time
   - transformers
   - uri-bytestring

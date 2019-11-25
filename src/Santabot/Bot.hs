@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE MonadComprehensions       #-}
 {-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeInType                #-}
@@ -29,10 +30,10 @@ import           Data.Functor
 import           Data.Text                (Text)
 import           Data.Time                as Time
 import           Numeric.Interval         (Interval, (...))
-import           Text.Printf
 import qualified Data.Conduit.Combinators as C
 import qualified Data.Map                 as M
 import qualified Data.Text                as T
+import qualified Language.Haskell.Printf  as P
 
 data Message = M { mRoom :: String
                  , mUser :: String
@@ -80,7 +81,7 @@ commandBot C{..} = C.concatMapM parseMe
       _ -> pure Nothing
     displayMe room = \case
       Left  e -> pure . R room RTMessage . T.pack $
-        printf "%s: %s (!help %s for help)"
+        [P.s|%s: %s (!help %s for help)|]
           cName (T.unpack e) cName
       Right r -> R room RTMessage <$> cResp r
 
@@ -104,7 +105,7 @@ helpBot cs = C
         <> M.singleton "help" "Display list of commands"
     processHelp = \case
       Nothing         -> ("Available commands: " <>) . T.intercalate ", " $ M.keys cMap
-      Just (cmd, msg) -> T.pack $ printf "%s: %s" (T.unpack cmd) (T.unpack msg)
+      Just (cmd, msg) -> T.pack $ [P.s|%s: %s|] (T.unpack cmd) (T.unpack msg)
 
 simpleCommand
     :: Applicative m

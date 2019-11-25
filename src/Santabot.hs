@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
 {-# LANGUAGE TupleSections             #-}
@@ -22,7 +23,7 @@ module Santabot (
   ) where
 
 import           Advent
-import           Advent.API                 as Advent
+import           Advent.API                as Advent
 import           Advent.Cache
 import           Advent.Reddit
 import           Advent.Types
@@ -34,11 +35,11 @@ import           Data.Char
 import           Data.Finite
 import           Data.Foldable
 import           Data.Functor
-import           Data.Map                   (Map)
+import           Data.Map                  (Map)
 import           Data.Maybe
-import           Data.Set                   (Set)
-import           Data.Text                  (Text)
-import           Data.Time                  as Time
+import           Data.Set                  (Set)
+import           Data.Text                 (Text)
+import           Data.Time                 as Time
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -47,15 +48,15 @@ import           System.Directory
 import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
-import           Text.Printf
-import           Text.Read                  (readMaybe)
-import qualified Data.Duration              as DD
-import qualified Data.Map                   as M
-import qualified Data.Set                   as S
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Yaml                  as Y
-import qualified Numeric.Interval           as I
+import           Text.Read                 (readMaybe)
+import qualified Data.Duration             as DD
+import qualified Data.Map                  as M
+import qualified Data.Set                  as S
+import qualified Data.Text                 as T
+import qualified Data.Text.Encoding        as T
+import qualified Data.Yaml                 as Y
+import qualified Language.Haskell.Printf   as P
+import qualified Numeric.Interval          as I
 
 santaPhrases :: Set Text
 santaPhrases = S.fromList
@@ -114,7 +115,8 @@ puzzleThread = C
     , cResp  = \(y,d) -> liftIO $
         getPostLink y d <&> \case
           Nothing -> "Thread not available, sorry!"
-          Just u  -> T.pack $ printf "[%d Day %d] %s" y (dayInt d) u
+          Just u  -> T.pack $
+            [P.s|[%d Day %d] %s|] y (dayInt d) u
     }
 
 -- TODO: make this just return the current day's puzzle, if it exists.
@@ -160,11 +162,11 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
         dur       = realToFrac $ nextTime `diffLocalTime` t
         durString = T.unpack . T.strip . T.pack
                   $ DD.humanReadableDuration dur
-    addSantaPhrase . T.pack $ printf
-      "Next puzzle (%d Day %d) will be released in %s."
-      y
-      (dayInt d)
-      durString
+    addSantaPhrase . T.pack $
+      [P.s|Next puzzle (%d Day %d) will be released in %s.|]
+        y
+        (dayInt d)
+        durString
   where
     nextDay (toGregorian->(y,m,d))
       | m < 12    = (y, minBound)
@@ -198,10 +200,10 @@ challengeCountdown = A
           ]
         pick t e = guard (t `I.member` i) *> e
     displayCE (d, yr) = \case
-      CEHour   -> printf "One hour until Day %d challenge!" (dayInt d)
-      CETenMin -> printf "Ten minutes until Day %d challenge!" (dayInt d)
-      CEMinute -> printf "One minute until Day %d challenge!" (dayInt d)
-      CEStart  -> printf "Day %d challenge now online at %s !" (dayInt d) (displayLink yr d)
+      CEHour   -> [P.s|One hour until Day %d challenge!|] (dayInt d)
+      CETenMin -> [P.s|Ten minutes until Day %d challenge!|] (dayInt d)
+      CEMinute -> [P.s|One minute until Day %d challenge!|] (dayInt d)
+      CEStart  -> [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d)
 
 eventCountdown :: MonadIO m => Alert m
 eventCountdown = A
@@ -218,7 +220,7 @@ eventCountdown = A
         (y,m,_)  = toGregorian d
         daysLeft = packFinite @14 $ (fromGregorian y 12 1 `diffDays` d) - 1
 
-    displayCE d = printf "%d day%s left until Advent of Code %d!" n suff
+    displayCE d = [P.s|%d day%s left until Advent of Code %d!|] n suff
       where
         n = getFinite d + 1
         suff | n == 1    = "" :: String
@@ -239,7 +241,7 @@ boardCapped = A
         liftIO $ createDirectoryIfMissing True logDir
         guard $ mm == 12
         d' <- maybe empty pure $ mkDay (fromIntegral dd)
-        let logFP = logDir </> printf "%d-%02d" yy (dayInt d') -<.> "yaml"
+        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
         liftIO (getCapState logFP) >>= \case
           CSPos   -> empty
           CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
@@ -258,7 +260,9 @@ boardCapped = A
                        . utcToLocalTime (read "EST")
                      <$> finalTime
             timeString' = either (const "") id timeString
-        pure . T.pack $ printf "Leaderboard for Day %d is now capped %s(%s)!" (dayInt d) timeString' linkUrl
+        pure . T.pack $
+          [P.s|Leaderboard for Day %d is now capped %s(%s)!|]
+            (dayInt d) timeString' linkUrl
       where
     getCapState l = readFileMaybe l <&> \case
       Nothing -> CSEmpty
