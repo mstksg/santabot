@@ -47,6 +47,7 @@ data Event = ETick LocalTime            -- ^ time for AoC servers
 
 data RespType = RTMessage
               | RTAction
+              | RTNotice
   deriving Show
 
 data Resp = R { rRoom :: String
@@ -129,7 +130,7 @@ commandBots cs = mergeBots . map commandBot $ helpBot cs : cs
 
 data Alert m = forall a. A
     { aTrigger :: Interval LocalTime -> m (Maybe a)
-    , aResp    :: a -> m Text
+    , aResp    :: a -> m (Bool, Text)       -- ^ Bool is whether or not to NOTICE (otherwise, ACTION)
     }
 
 alertBot
@@ -140,7 +141,7 @@ alertBot
 alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
                 .| consecs
                 .| C.concatMapM aTrigger
-                .| C.mapM (fmap (R c RTAction) . aResp)
+                .| C.mapM (fmap (uncurry (R c . toResp)) . aResp)
   where
     consecs = do
         x0 <- await
@@ -151,6 +152,9 @@ alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTi
           forM_ x1_ $ \x1 -> do
             yield (x0 ... x1)
             go x1
+    toResp = \case
+      False -> RTAction
+      True  -> RTNotice
 
 aocTime :: IO LocalTime
 aocTime = utcToLocalTime (read "EST") <$> liftIO getCurrentTime

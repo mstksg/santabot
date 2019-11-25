@@ -83,7 +83,9 @@ launchIRC channels nick pwd tick bot = do
               .| C.mapM_ (sendRaw irc)
               .| C.sinkNull
 
+-- | Need this until https://github.com/dom96/SimpleIRC/pull/29 is merged
 respRaw :: Resp -> BS.ByteString
 respRaw R{..} = T.encodeUtf8 . T.pack $ case rType of
     RTMessage -> [P.s|PRIVMSG %s : %s|] rRoom (T.unpack rBody)
     RTAction  -> [P.s|PRIVMSG %s :\SOHACTION %s\SOH|] rRoom (T.unpack rBody)
+    RTNotice  -> [P.s|NOTICE  %s :%s|] rRoom (T.unpack rBody)

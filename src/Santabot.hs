@@ -182,7 +182,8 @@ data ChallengeEvent = CEHour
 challengeCountdown :: MonadIO m => Alert m
 challengeCountdown = A
     { aTrigger = pure . challengeEvent
-    , aResp    = addSantaPhrase . T.pack . uncurry displayCE
+    , aResp    = traverse (addSantaPhrase . T.pack)
+               . uncurry displayCE
     }
   where
     challengeEvent i = do
@@ -200,15 +201,15 @@ challengeCountdown = A
           ]
         pick t e = guard (t `I.member` i) *> e
     displayCE (d, yr) = \case
-      CEHour   -> [P.s|One hour until Day %d challenge!|] (dayInt d)
-      CETenMin -> [P.s|Ten minutes until Day %d challenge!|] (dayInt d)
-      CEMinute -> [P.s|One minute until Day %d challenge!|] (dayInt d)
-      CEStart  -> [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d)
+      CEHour   -> (False, [P.s|One hour until Day %d challenge!|]    (dayInt d)                   )
+      CETenMin -> (False, [P.s|Ten minutes until Day %d challenge!|] (dayInt d)                   )
+      CEMinute -> (False, [P.s|One minute until Day %d challenge!|]  (dayInt d)                   )
+      CEStart  -> (True , [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d))
 
 eventCountdown :: MonadIO m => Alert m
 eventCountdown = A
     { aTrigger = pure . countdownEvent
-    , aResp    = addSantaPhrase . T.pack . uncurry displayCE
+    , aResp    = fmap (True,) . addSantaPhrase . T.pack . uncurry displayCE
     }
   where
     countdownEvent i = do
@@ -233,7 +234,7 @@ data CapState = CSEmpty     -- ^ file not even made yet
 boardCapped :: MonadIO m => Alert m
 boardCapped = A
     { aTrigger = risingEdge
-    , aResp    = addSantaPhrase <=< uncurry sendEdge
+    , aResp    = fmap (True,) . addSantaPhrase <=< uncurry sendEdge
     }
   where
     logDir = "cache/capped"
@@ -275,7 +276,7 @@ boardCapped = A
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A
     { aTrigger = pure . Just
-    , aResp    = pure . T.pack . show
+    , aResp    = pure . (False,) . T.pack . show
     }
 
 validYears :: IO (Set Integer)
