@@ -4,3 +4,4 @@ santabot-conf.yaml
 data/wikitest.md
 cache
 *~
+*.dump*

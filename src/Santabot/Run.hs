@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -17,9 +18,11 @@ import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
 import           Network.SimpleIRC               as IRC
 import           Santabot.Bot
+import qualified Data.ByteString                 as BS
 import qualified Data.Conduit.Combinators        as C
 import qualified Data.Text                       as T
 import qualified Data.Text.Encoding              as T
+import qualified Language.Haskell.Printf         as P
 
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
@@ -75,14 +78,11 @@ launchIRC channels nick pwd tick bot = do
 
     runConduit $ sourceTBMQueue eventQueue
               .| bot
-              .| C.map respCommand
-              .| C.mapM_ (sendCmd irc)
+              .| C.map respRaw
+              .| C.mapM_ (sendRaw irc)
               .| C.sinkNull
 
-respCommand :: Resp -> IRC.Command
-respCommand R{..} = case rType of
-    RTMessage -> MPrivmsg rm msg
-    RTAction  -> MAction  rm msg
-  where
-    rm  = T.encodeUtf8 . T.pack $ rRoom
-    msg = T.encodeUtf8 $ " " <> rBody
+respRaw :: Resp -> BS.ByteString
+respRaw R{..} = T.encodeUtf8 . T.pack $ case rType of
+    RTMessage -> [P.s|PRIVMSG %s : %s|] rRoom (T.unpack rBody)
+    RTAction  -> [P.s|PRIVMSG %s :%cACTION %s%c|] rRoom '\x01' (T.unpack rBody) '\x01'
