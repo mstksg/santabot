@@ -5,6 +5,7 @@
 
 module Santabot.Run (
     launchIRC
+  , respRaw
   ) where
 
 import           Control.Applicative
@@ -85,4 +86,4 @@ launchIRC channels nick pwd tick bot = do
 respRaw :: Resp -> BS.ByteString
 respRaw R{..} = T.encodeUtf8 . T.pack $ case rType of
     RTMessage -> [P.s|PRIVMSG %s : %s|] rRoom (T.unpack rBody)
-    RTAction  -> [P.s|PRIVMSG %s :%cACTION %s%c|] rRoom '\x01' (T.unpack rBody) '\x01'
+    RTAction  -> [P.s|PRIVMSG %s :\SOHACTION %s\SOH|] rRoom (T.unpack rBody)
