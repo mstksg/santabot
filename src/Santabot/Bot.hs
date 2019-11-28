@@ -22,6 +22,7 @@ module Santabot.Bot (
   , simpleCommand
   , helpBot
   , aocTime
+  , intervals
   ) where
 
 import           Conduit
@@ -138,10 +139,17 @@ alertBot
     => String       -- ^ channel
     -> Alert m
     -> Bot m ()
-alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
-                .| consecs
+alertBot c A{..} = intervals
                 .| C.concatMapM aTrigger
                 .| C.mapM (fmap (uncurry (R c . toResp)) . aResp)
+  where
+    toResp = \case
+      False -> RTAction
+      True  -> RTNotice
+
+intervals :: Monad m => ConduitT Event (Interval LocalTime) m ()
+intervals = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
+         .| consecs
   where
     consecs = do
         x0 <- await
@@ -152,9 +160,6 @@ alertBot c A{..} = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTi
           forM_ x1_ $ \x1 -> do
             yield (x0 ... x1)
             go x1
-    toResp = \case
-      False -> RTAction
-      True  -> RTNotice
 
 aocTime :: IO LocalTime
 aocTime = utcToLocalTime (read "EST") <$> liftIO getCurrentTime
