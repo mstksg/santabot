@@ -50,6 +50,7 @@ import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
 import           Text.Read                 (readMaybe)
+import           Debug.Trace
 import qualified Data.Duration             as DD
 import qualified Data.Map                  as M
 import qualified Data.Set                  as S
@@ -160,7 +161,7 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
     t <- liftIO aocTime
     let (y, d)    = nextDay (localDay t)
         nextTime  = LocalTime (fromGregorian y 12 (fromIntegral (dayInt d))) midnight
-        dur       = realToFrac $ nextTime `diffLocalTime` t
+        dur       = traceShowId $ realToFrac $ nextTime `diffLocalTime` t
         durString = T.unpack . T.strip . T.pack
                   $ DD.humanReadableDuration dur
     addSantaPhrase . T.pack $
@@ -171,7 +172,7 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
   where
     nextDay (toGregorian->(y,m,d))
       | m < 12    = (y, minBound)
-      | otherwise = case mkDay (fromIntegral d) of
+      | otherwise = case mkDay (fromIntegral d + 1) of
           Nothing -> (y + 1, minBound)
           Just d' -> (y    , d'      )
 
