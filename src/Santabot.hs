@@ -178,6 +178,7 @@ data ChallengeEvent = CEHour
                     | CETenMin
                     | CEMinute
                     | CEStart
+  deriving Show
 
 challengeCountdown :: MonadIO m => Alert m
 challengeCountdown = A
@@ -187,17 +188,18 @@ challengeCountdown = A
     }
   where
     challengeEvent i = do
-        guard $ mm == 12 || (mm == 11 && dd == 30)
+        guard $ (mm == 12) || (mm == 11 && dd == 30)
         first (,yy) <$> do
           listToMaybe . mapMaybe (uncurry pick) $ evts
       where
         d = localDay $ I.sup i
-        (yy,mm,dd) = toGregorian d
+        (yy ,mm, dd ) = toGregorian d
+        (_  ,_  ,dd') = toGregorian (succ d)
         evts =
-          [ (LocalTime d midnight           , (,CEStart ) <$> mkDay (fromIntegral dd    ))
-          , (LocalTime d (TimeOfDay 11 0  0), (,CEHour  ) <$> mkDay (fromIntegral dd + 1))
-          , (LocalTime d (TimeOfDay 11 50 0), (,CETenMin) <$> mkDay (fromIntegral dd + 1))
-          , (LocalTime d (TimeOfDay 11 59 0), (,CEMinute) <$> mkDay (fromIntegral dd + 1))
+          [ (LocalTime d midnight           , (,CEStart ) <$> mkDay (fromIntegral dd ))
+          , (LocalTime d (TimeOfDay 23 0  0), (,CEHour  ) <$> mkDay (fromIntegral dd'))
+          , (LocalTime d (TimeOfDay 23 50 0), (,CETenMin) <$> mkDay (fromIntegral dd'))
+          , (LocalTime d (TimeOfDay 23 59 0), (,CEMinute) <$> mkDay (fromIntegral dd'))
           ]
         pick t e = guard (t `I.member` i) *> e
     displayCE (d, yr) = \case
