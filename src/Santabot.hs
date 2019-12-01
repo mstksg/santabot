@@ -20,6 +20,7 @@ module Santabot (
   , acknowledgeTick
   , santaPhrases
   , addSantaPhrase
+  , validYears
   ) where
 
 import           Advent
@@ -257,7 +258,7 @@ boardCapped = A
         (yy,mm,dd) = toGregorian d
     sendEdge linkUrl (logFP, (y, d)) = liftIO $ do
         Y.encodeFile logFP True
-        lb <- runAoC (defaultAoCOpts y"") $ AoCDailyLeaderboard d
+        lb <- runAoC (defaultAoCOpts y "") $ AoCDailyLeaderboard d
         let finalTime  = maximum . map dlbmTime . toList . dlbStar2 <$> lb
             timeString = formatTime defaultTimeLocale "at %H:%M:%S EST "
                        . utcToLocalTime (read "EST")
@@ -283,8 +284,10 @@ acknowledgeTick = A
 
 validYears :: IO (Set Integer)
 validYears = do
-    (y, _, _) <- toGregorian . localDay <$> aocTime
-    pure $ S.fromList [2015 .. y]
+    (y, mm, _) <- toGregorian . localDay <$> aocTime
+    let y' | mm >= 11  = y
+           | otherwise = y - 1
+    pure $ S.fromList [2015 .. y']
 
 displayLink :: Integer -> Advent.Day -> String
 displayLink yr day = u

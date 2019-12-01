@@ -1,13 +1,17 @@
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
 import           GHC.Generics
 import           Santabot
 import           Santabot.Bot
 import           Santabot.Run
-import qualified Data.Aeson   as A
-import qualified Data.Yaml    as Y
+import qualified Data.Aeson              as A
+import qualified Data.Set                as S
+import qualified Data.Text               as T
+import qualified Data.Yaml               as Y
+import qualified Language.Haskell.Printf as P
 
 data Conf = Conf
     { cChannels :: [String]
@@ -31,8 +35,11 @@ masterBot alerts = mergeBots
       , nextPuzzle
       , simpleCommand "about" "Information about santabot" . addSantaPhrase $
           "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
-      , simpleCommand "leaderboard" "IRC leaderboard" . addSantaPhrase $
-          "Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/2018/leaderboard/private/view/382266."
+      , simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
+          Just y <- S.lookupMax <$> validYears
+          pure . T.pack $
+            [P.s|Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
+            y
       ]
   , alertBot alerts challengeCountdown
   , alertBot alerts eventCountdown

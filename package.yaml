@@ -69,9 +69,12 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - santabot
-    - yaml
     - aeson
+    - containers
+    - santabot
+    - text
+    - th-printf
+    - yaml
 
 # tests:
 #   santabot-test:
