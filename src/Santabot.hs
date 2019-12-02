@@ -16,7 +16,7 @@ module Santabot (
   , nextPuzzle
   , challengeCountdown
   , eventCountdown
-  , boardCapped
+  -- , boardCapped
   , acknowledgeTick
   , santaPhrases
   , addSantaPhrase
@@ -235,46 +235,46 @@ data CapState = CSEmpty     -- ^ file not even made yet
               | CSNeg       -- ^ file made but it is False
               | CSPos       -- ^ file made and it is True
 
-boardCapped :: MonadIO m => Alert m
-boardCapped = A
-    { aTrigger = risingEdge
-    , aResp    = fmap (True,) . addSantaPhrase <=< uncurry sendEdge
-    }
-  where
-    logDir = "cache/capped"
-    risingEdge (I.sup->i) = runMaybeT $ do
-        liftIO $ createDirectoryIfMissing True logDir
-        guard $ mm == 12
-        d' <- maybe empty pure $ mkDay (fromIntegral dd)
-        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
-        liftIO (getCapState logFP) >>= \case
-          CSPos   -> empty
-          CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
-          CSNeg   -> do
-            u  <- MaybeT . liftIO $ getPostLink yy d'
-            guard =<< liftIO (checkUncapped u)
-            pure (u, (logFP, (yy, d')))
-      where
-        d          = localDay i
-        (yy,mm,dd) = toGregorian d
-    sendEdge linkUrl (logFP, (y, d)) = liftIO $ do
-        Y.encodeFile logFP True
-        lb <- runAoC (defaultAoCOpts y "") $ AoCDailyLeaderboard d
-        let finalTime  = maximum . map dlbmTime . toList . dlbStar2 <$> lb
-            timeString = formatTime defaultTimeLocale "at %H:%M:%S EST "
-                       . utcToLocalTime (read "EST")
-                     <$> finalTime
-            timeString' = either (const "") id timeString
-        pure . T.pack $
-          [P.s|Leaderboard for Day %d is now capped %s(%s)!|]
-            (dayInt d) timeString' linkUrl
-      where
-    getCapState l = readFileMaybe l <&> \case
-      Nothing -> CSEmpty
-      Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
-        Left _      -> CSEmpty
-        Right False -> CSNeg
-        Right True  -> CSPos
+-- boardCapped :: MonadIO m => Alert m
+-- boardCapped = A
+--     { aTrigger = risingEdge
+--     , aResp    = fmap (True,) . addSantaPhrase <=< uncurry sendEdge
+--     }
+--   where
+--     logDir = "cache/capped"
+--     risingEdge (I.sup->i) = runMaybeT $ do
+--         liftIO $ createDirectoryIfMissing True logDir
+--         guard $ mm == 12
+--         d' <- maybe empty pure $ mkDay (fromIntegral dd)
+--         let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
+--         liftIO (getCapState logFP) >>= \case
+--           CSPos   -> empty
+--           CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
+--           CSNeg   -> do
+--             u  <- MaybeT . liftIO $ getPostLink yy d'
+--             guard =<< liftIO (checkUncapped u)
+--             pure (u, (logFP, (yy, d')))
+--       where
+--         d          = localDay i
+--         (yy,mm,dd) = toGregorian d
+--     sendEdge linkUrl (logFP, (y, d)) = liftIO $ do
+--         Y.encodeFile logFP True
+--         lb <- runAoC (defaultAoCOpts y "") $ AoCDailyLeaderboard d
+--         let finalTime  = maximum . map dlbmTime . toList . dlbStar2 <$> lb
+--             timeString = formatTime defaultTimeLocale "at %H:%M:%S EST "
+--                        . utcToLocalTime (read "EST")
+--                      <$> finalTime
+--             timeString' = either (const "") id timeString
+--         pure . T.pack $
+--           [P.s|Leaderboard for Day %d is now capped %s(%s)!|]
+--             (dayInt d) timeString' linkUrl
+--       where
+--     getCapState l = readFileMaybe l <&> \case
+--       Nothing -> CSEmpty
+--       Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
+--         Left _      -> CSEmpty
+--         Right False -> CSNeg
+--         Right True  -> CSPos
 
 
 acknowledgeTick :: Applicative m => Alert m

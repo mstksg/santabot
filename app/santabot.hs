@@ -3,6 +3,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+import           Advent.Module.Intcode
 import           GHC.Generics
 import           Santabot
 import           Santabot.Bot
@@ -33,6 +34,7 @@ masterBot alerts = mergeBots
       [ puzzleLink
       , puzzleThread
       , nextPuzzle
+      , intcodeBot
       , simpleCommand "about" "Information about santabot" . addSantaPhrase $
           "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
       , simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
@@ -43,7 +45,7 @@ masterBot alerts = mergeBots
       ]
   , alertBot alerts challengeCountdown
   , alertBot alerts eventCountdown
-  , alertBot alerts boardCapped
+  -- , alertBot alerts boardCapped
   ]
 
 main :: IO ()
