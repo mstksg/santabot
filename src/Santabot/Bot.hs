@@ -162,4 +162,4 @@ intervals = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
             go x1
 
 aocTime :: IO LocalTime
-aocTime = utcToLocalTime (read "EST") <$> liftIO getCurrentTime
+aocTime = utcToLocalTime (read "EST") <$> getCurrentTime

@@ -74,6 +74,7 @@ executables:
     - santabot
     - text
     - th-printf
+    - time
     - yaml
 
 # tests:
