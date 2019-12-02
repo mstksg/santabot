@@ -45,7 +45,7 @@ masterBot alerts = mergeBots
       ]
   , alertBot alerts challengeCountdown
   , alertBot alerts eventCountdown
-  -- , alertBot alerts boardCapped
+  , alertBot alerts boardCapped
   ]
 
 main :: IO ()
