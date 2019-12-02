@@ -18,7 +18,7 @@ module Santabot (
   , eventCountdown
   , boardCapped
   , acknowledgeTick
-  , santaPhrases
+  , Phrasebook
   , addSantaPhrase
   , validYears
   ) where
@@ -30,6 +30,7 @@ import           Advent.Reddit
 import           Advent.Types
 import           Conduit
 import           Control.Monad
+import           Control.Monad.Reader
 import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor
 import           Data.Char
@@ -41,6 +42,7 @@ import           Data.Maybe
 import           Data.Set                  (Set)
 import           Data.Text                 (Text)
 import           Data.Time                 as Time
+import           Debug.Trace
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -50,7 +52,6 @@ import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
 import           Text.Read                 (readMaybe)
-import           Debug.Trace
 import qualified Data.Duration             as DD
 import qualified Data.Map                  as M
 import qualified Data.Set                  as S
@@ -60,46 +61,7 @@ import qualified Data.Yaml                 as Y
 import qualified Language.Haskell.Printf   as P
 import qualified Numeric.Interval          as I
 
-santaPhrases :: Set Text
-santaPhrases = S.fromList
-    [ "Ho ho ho!"
-    , "Deck the channels!"
-    , "Joy to the freenode!"
-    , "I just elfed myself!"
-    , "Have you been naughty or nice?"
-    , "Won't you guide my debugger tonight?"
-    , "Calling all reindeer!"
-    , "Run that checksum twice!"
-    , "Yule be in for a treat!"
-    , "A round of Santa-plause, please."
-    , "Let it snow!"
-    , "Jingle \\a, jingle all the way!"
-    , "Hoooo ho ho!"
-    , "Do you hear what I hear?"
-    , "Who's ready for Christmas cheer?"
-    , "Get out the hot cocoa!"
-    , "I'm dreaming of a bug-free Christmas!"
-    , "My list is formally verified twice!"
-    , "Now Dasher, now Dancer!"
-    , "It's the most wonderful time of the year!"
-    , "Francisco!"
-    , "Son of a nutcracker!"
-    , "Has anyone seen my sleigh?"
-    , "Sharpen up your elfcode!"
-    , "Sing loud for all to hear!"
-    , "Time to spread some Christmas cheer!"
-    , "It's silly, but I believe!"
-    , "Yipee ki-yay, coders!"
-    , "Welcome to the party, pal."
-    , "I'll be $HOME for Christmas!"
-    , "Hark!"
-    , "Hooo ho ho!"
-    , "Ho ho hoooo!"
-    , "Rest ye merry CPUs!"
-    , "Code yourself a merry little Christmas!"
-    , "Must've been some magic in that old compiler!"
-    ]
-
+type Phrasebook = Set Text
 
 puzzleLink :: MonadIO m => Command m
 puzzleLink = C
@@ -156,7 +118,7 @@ allPuzzles = do
     sequence . flip M.fromSet vy $ \y -> S.fromList <$>
       filterM (challengeReleased y) (Day <$> finites)
 
-nextPuzzle :: MonadIO m => Command m
+nextPuzzle :: (MonadIO m, MonadReader Phrasebook m) => Command m
 nextPuzzle = simpleCommand "next" "Display the time until the next puzzle release." $ do
     t <- liftIO aocTime
     let (y, d)    = nextDay (localDay t)
@@ -182,7 +144,7 @@ data ChallengeEvent = CEHour
                     | CEStart
   deriving Show
 
-challengeCountdown :: MonadIO m => Alert m
+challengeCountdown :: (MonadIO m, MonadReader Phrasebook m) => Alert m
 challengeCountdown = A
     { aTrigger = pure . challengeEvent
     , aResp    = traverse (addSantaPhrase . T.pack)
@@ -210,7 +172,7 @@ challengeCountdown = A
       CEMinute -> (False, [P.s|One minute until Day %d challenge!|]  (dayInt d)                   )
       CEStart  -> (True , [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d))
 
-eventCountdown :: MonadIO m => Alert m
+eventCountdown :: (MonadIO m, MonadReader Phrasebook m) => Alert m
 eventCountdown = A
     { aTrigger = pure . countdownEvent
     , aResp    = fmap (True,) . addSantaPhrase . T.pack . uncurry displayCE
@@ -235,7 +197,7 @@ data CapState = CSEmpty     -- ^ file not even made yet
               | CSNeg       -- ^ file made but it is False
               | CSPos       -- ^ file made and it is True
 
-boardCapped :: MonadIO m => Alert m
+boardCapped :: (MonadIO m, MonadReader Phrasebook m) => Alert m
 boardCapped = A
     { aTrigger = risingEdge
     , aResp    = fmap (True,) . addSantaPhrase <=< uncurry sendEdge
@@ -311,9 +273,11 @@ displayLink yr day = u
     rd :<|> _ = rp day
     u = showBaseUrl $ aocBase { baseUrlPath = show (linkURI rd) }
 
-addSantaPhrase :: MonadIO m => Text -> m Text
-addSantaPhrase txt = liftIO $ do
-    pick <- (`S.elemAt` santaPhrases)
-        <$> randomRIO (0, S.size santaPhrases - 1)
-    pure $ pick <> " " <> txt
+addSantaPhrase :: (MonadIO m, MonadReader Phrasebook m) => Text -> m Text
+addSantaPhrase txt = do
+    phrasebook <- ask
+    liftIO $ do
+      pick <- (`S.elemAt` phrasebook)
+          <$> randomRIO (0, S.size phrasebook - 1)
+      pure $ pick <> " " <> txt
 

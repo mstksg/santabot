@@ -44,6 +44,7 @@ library:
   - human-readable-duration
   - intervals
   - megaparsec
+  - mtl
   - parser-combinators
   - random
   - servant
@@ -70,7 +71,9 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - aeson
+    - conduit
     - containers
+    - mtl
     - santabot
     - text
     - th-printf

@@ -4,6 +4,8 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 import           Advent.Module.Intcode
+import           Control.Monad.Reader
+import           Data.Conduit.Lift
 import           Data.Time.Format
 import           GHC.Generics
 import           Santabot
@@ -29,8 +31,8 @@ instance A.FromJSON Conf where
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
-masterBot :: String -> Bot IO ()
-masterBot alerts = mergeBots
+masterBot :: Phrasebook -> String -> Bot IO ()
+masterBot phrasebook alerts = runReaderC phrasebook . mergeBots $
   [ commandBots
       [ puzzleLink
       , puzzleThread
@@ -39,14 +41,14 @@ masterBot alerts = mergeBots
       , simpleCommand "about" "Information about santabot" . addSantaPhrase $
           "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
       , simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
-          Just y <- S.lookupMax <$> validYears
+          Just y <- S.lookupMax <$> liftIO validYears
           pure . T.pack $
             [P.s|Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
             y
       , simpleCommand "time" "The current time on AoC servers" . (addSantaPhrase =<<) $ do
-          t <- aocTime
+          t <- liftIO aocTime
           pure . T.pack $
-            [P.s|The current AoC server time is %s.|]
+            [P.s|The current AoC server time is %s|]
             (formatTime defaultTimeLocale rfc822DateFormat t)
       ]
   , alertBot alerts challengeCountdown
@@ -56,5 +58,7 @@ masterBot alerts = mergeBots
 
 main :: IO ()
 main = do
-    Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
-    launchIRC cChannels cNick cPassword (cTick * 1000000) (masterBot cAlerts)
+    Conf{..}   <- Y.decodeFileThrow "santabot-conf.yaml"
+    phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
+    launchIRC cChannels cNick cPassword (cTick * 1000000)
+        (masterBot phrasebook cAlerts)
