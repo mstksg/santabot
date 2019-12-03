@@ -53,6 +53,7 @@ import           System.Random
 import           Text.Megaparsec
 import           Text.Read                 (readMaybe)
 import qualified Data.Duration             as DD
+import qualified Data.List.NonEmpty        as NE
 import qualified Data.Map                  as M
 import qualified Data.Set                  as S
 import qualified Data.Text                 as T
@@ -239,11 +240,12 @@ boardCapped = A
       t <- aocTime
       putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
-      lb <- runAoC (defaultAoCOpts y "") $ AoCDailyLeaderboard d
-      let isCapped   = fullDailyBoard <$> lb
-          finalTime  = maximum . map dlbmTime . toList . dlbStar2 <$> lb
-      pure . either (const Nothing) Just $
-        isCapped *> finalTime
+      mlb <- either (const Nothing) Just <$>
+        runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
+      pure $ mlb >>= \lb -> do
+        guard $ fullDailyBoard lb
+        entries <- NE.nonEmpty . toList . dlbStar2 $ lb
+        pure $ maximum (fmap dlbmTime entries)
 
     getCapState l = readFileMaybe l <&> \case
       Nothing -> CSEmpty
