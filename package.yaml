@@ -45,6 +45,7 @@ library:
   - intervals
   - megaparsec
   - mtl
+  - nonempty-containers
   - parser-combinators
   - random
   - servant

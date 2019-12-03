@@ -4,20 +4,22 @@
 
 module Advent.Module.Intcode (
     intcodeBot
-  , parseProg
-  , runProg
+  , parseIntcode
+  , runIntcode
   ) where
 
-import           Data.Sequence           (Seq(..))
+import           Data.Bifunctor
+import           Data.Sequence.NonEmpty  (NESeq(..))
 import           Santabot.Bot
-import qualified Data.Sequence           as Seq
+import qualified Data.List.NonEmpty      as NE
+import qualified Data.Sequence.NonEmpty  as NESeq
 import qualified Data.Text               as T
 import qualified Data.Text.Read          as T
 import qualified Language.Haskell.Printf as P
 
 data Memory = Mem
     { mPos  :: !Int
-    , mRegs :: !(Seq Int)
+    , mRegs :: !(NESeq Int)
     }
   deriving Show
 
@@ -37,30 +39,29 @@ step (Mem p r) = do
     c <- look (p + 3)
     y <- look a
     z <- look b
-    pure $ Mem (p + 4) (Seq.update c (o y z) r)
+    pure $ Mem (p + 4) (NESeq.update c (o y z) r)
   where
     look i = m2e (Just $ [P.s|out of bounds: %d|] i) $
-               Seq.lookup i r
+               NESeq.lookup i r
 
-runProg :: Memory -> Either String Int
-runProg m = case step m of
-    Left Nothing -> case Seq.lookup 0 (mRegs m) of
-      Nothing -> Left "errored with: empty register"
-      Just x  -> Right x
+runIntcode :: Memory -> Either String Int
+runIntcode m = case step m of
+    Left Nothing  -> Right $ NESeq.head (mRegs m)
     Left (Just e) -> Left $ "errored with: " ++ e
-    Right m'  -> runProg m'
+    Right m'  -> runIntcode m'
 
-parseProg :: T.Text -> Maybe Memory
-parseProg = fmap (Mem 0 . Seq.fromList)
-          . traverse (either (const Nothing) (Just . fst) . T.signed T.decimal . T.strip)
-          . T.splitOn ","
+parseIntcode :: T.Text -> Either String Memory
+parseIntcode str = do
+    xs <- m2e "empty register" . NE.nonEmpty . T.splitOn "," $ str
+    rs <- first (const "no parse integer")
+        . traverse (fmap fst . T.signed T.decimal . T.strip)
+        $ xs
+    pure $ Mem 0 (NESeq.fromList rs)
 
 intcodeBot :: Applicative m => Command m
 intcodeBot = C
     { cName  = "intcode"
     , cHelp  = "Run arbitrary intcode (2019 Day 2) and try to crash jle`'s digial ocean droplet"
-    , cParse = \m -> pure $ case parseProg (mBody m) of
-                       Nothing -> Left "could not parse intcode program"
-                       Just mm -> Right mm
-    , cResp  = pure . T.pack . either id [P.s|halted with position 0 = %d|] . runProg
+    , cParse = pure . first (("parse error: " <>) . T.pack) . parseIntcode . mBody
+    , cResp  = pure . T.pack . either id [P.s|halted with position 0 = %d|] . runIntcode
     }
