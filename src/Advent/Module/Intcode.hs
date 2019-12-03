@@ -53,7 +53,7 @@ runIntcode m = case step m of
 parseIntcode :: T.Text -> Either String Memory
 parseIntcode str = do
     xs <- m2e "empty register" . NE.nonEmpty . T.splitOn "," $ str
-    rs <- first (const "no parse integer")
+    rs <- first (const "could not parse integer")
         . traverse (fmap fst . T.signed T.decimal . T.strip)
         $ xs
     pure $ Mem 0 (NESeq.fromList rs)
