@@ -8,6 +8,7 @@ module Santabot.Run (
   , respRaw
   ) where
 
+import           Advent
 import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.STM
@@ -74,7 +75,7 @@ launchIRC channels nick pwd tick bot = do
       threadDelay 5000000
       forever $ do
         threadDelay tick
-        t <- aocTime
+        t <- aocServerTime
         atomically $ writeTBMQueue eventQueue (ETick t)
 
     runConduit $ sourceTBMQueue eventQueue

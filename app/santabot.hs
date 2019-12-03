@@ -3,6 +3,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
+import           Advent
 import           Advent.Module.Intcode
 import           Control.Monad.Reader
 import           Data.Conduit.Lift
@@ -46,7 +47,7 @@ masterBot phrasebook alerts = runReaderC phrasebook . mergeBots $
             [P.s|Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
             y
       , simpleCommand "time" "The current time on AoC servers" . (addSantaPhrase =<<) $ do
-          t <- liftIO aocTime
+          t <- liftIO aocServerTime
           pure . T.pack $
             [P.s|The current AoC server time is %s|]
             (formatTime defaultTimeLocale rfc822DateFormat t)

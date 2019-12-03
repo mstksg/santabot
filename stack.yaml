@@ -40,7 +40,7 @@ packages:
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
 extra-deps:
-- advent-of-code-api-0.2.4.2
+- advent-of-code-api-0.2.6.1
 - simpleirc-0.3.1
 
 ghc-options:

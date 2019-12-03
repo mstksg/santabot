@@ -21,15 +21,17 @@ module Santabot (
   , Phrasebook
   , addSantaPhrase
   , validYears
+  , dayTitle
   ) where
 
 import           Advent
-import           Advent.API                as Advent
+import           Advent.API                 as Advent
 import           Advent.Cache
 import           Advent.Reddit
 import           Advent.Types
 import           Conduit
 import           Control.Monad
+import           Control.Monad.Combinators
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor
@@ -37,11 +39,11 @@ import           Data.Char
 import           Data.Finite
 import           Data.Foldable
 import           Data.Functor
-import           Data.Map                  (Map)
+import           Data.Map                   (Map)
 import           Data.Maybe
-import           Data.Set                  (Set)
-import           Data.Text                 (Text)
-import           Data.Time                 as Time
+import           Data.Set                   (Set)
+import           Data.Text                  (Text)
+import           Data.Time                  as Time
 import           Debug.Trace
 import           Santabot.Bot
 import           Servant.API
@@ -51,16 +53,17 @@ import           System.Directory
 import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
-import           Text.Read                 (readMaybe)
-import qualified Data.Duration             as DD
-import qualified Data.List.NonEmpty        as NE
-import qualified Data.Map                  as M
-import qualified Data.Set                  as S
-import qualified Data.Text                 as T
-import qualified Data.Text.Encoding        as T
-import qualified Data.Yaml                 as Y
-import qualified Language.Haskell.Printf   as P
-import qualified Numeric.Interval          as I
+import           Text.Read                  (readMaybe)
+import qualified Data.Duration              as DD
+import qualified Data.List.NonEmpty         as NE
+import qualified Data.Map                   as M
+import qualified Data.Set                   as S
+import qualified Data.Text                  as T
+import qualified Data.Text.Encoding         as T
+import qualified Data.Yaml                  as Y
+import qualified Language.Haskell.Printf    as P
+import qualified Numeric.Interval           as I
+import qualified Text.Megaparsec.Char.Lexer as P
 
 type Phrasebook = Set Text
 
@@ -69,7 +72,7 @@ puzzleLink = C
     { cName  = "link"
     , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  If bad day or year given, just returns most recent match."
     , cParse = askLink
-    , cResp  = pure . T.pack . uncurry displayLink
+    , cResp  = \(y,d) -> liftIO $ fancyLink y d (displayLink y d)
     }
 
 puzzleThread :: MonadIO m => Command m
@@ -77,14 +80,18 @@ puzzleThread = C
     { cName  = "thread"
     , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!thread 23, !thread 2017 16).  If bad day or year given, just returns most recent match."
     , cParse = askLink
-    , cResp  = \(y,d) -> liftIO $
-        getPostLink y d <&> \case
-          Nothing -> "Thread not available, sorry!"
-          Just u  -> T.pack $
-            [P.s|[%d Day %d] %s|] y (dayInt d) u
+    , cResp  = \(y,d) -> liftIO $ do
+        getPostLink y d >>= \case
+          Nothing -> pure "Thread not available, sorry!"
+          Just u  -> fancyLink y d u
     }
 
--- TODO: make this just return the current day's puzzle, if it exists.
+fancyLink :: Integer -> Advent.Day -> String -> IO Text
+fancyLink y d url = do
+    title <- foldMap (" -- " <>) <$> dayTitle y d
+    pure . T.pack $
+      [P.s|[%d Day %d] %s%s|] y (dayInt d) url (T.unpack title)
+
 askLink
     :: MonadIO m
     => Message
@@ -93,7 +100,7 @@ askLink M{..} = do
     allP <- liftIO allPuzzles
     case listToMaybe (mapMaybe mkDay w) of
       Nothing  -> do
-        (y, m, d) <- toGregorian . localDay <$> liftIO aocTime
+        (y, m, d) <- toGregorian . localDay <$> liftIO aocServerTime
         case mkDay (fromIntegral d) of
           Just dd
             | m == 12
@@ -113,6 +120,21 @@ askLink M{..} = do
       | isDigit c = c
       | otherwise = ' '
 
+dayTitle :: Integer -> Advent.Day -> IO (Maybe Text)
+dayTitle y d = runMaybeT $ do
+    ps <- MaybeT $ either (const Nothing) Just <$>
+      runAoC (defaultAoCOpts y "") (AoCPrompt d)
+    p1 <- maybe empty pure $ M.lookup Part1 ps
+    either (const empty) pure $
+      parse parseTitle "" p1
+  where
+    parseTitle :: Parsec Void Text Text
+    parseTitle = between (try "<h2>") (try "</h2>") $ do
+      _ <- "--- Day "
+      _ <- P.decimal @_ @_ @_ @Integer
+      _ <- ": "
+      T.strip . T.pack <$> manyTill anySingle (try " ---")
+
 allPuzzles :: IO (Map Integer (Set Advent.Day))
 allPuzzles = do
     vy <- validYears
@@ -121,7 +143,7 @@ allPuzzles = do
 
 nextPuzzle :: (MonadIO m, MonadReader Phrasebook m) => Command m
 nextPuzzle = simpleCommand "next" "Display the time until the next puzzle release." $ do
-    t <- liftIO aocTime
+    t <- liftIO aocServerTime
     let (y, d)    = nextDay (localDay t)
         nextTime  = LocalTime (fromGregorian y 12 (fromIntegral (dayInt d))) midnight
         dur       = traceShowId $ realToFrac $ nextTime `diffLocalTime` t
@@ -237,7 +259,7 @@ boardCapped = A
       where
     leaderboardCapTime :: Integer -> Advent.Day -> IO (Maybe UTCTime)
     leaderboardCapTime y d = do
-      t <- aocTime
+      t <- aocServerTime
       putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
       mlb <- either (const Nothing) Just <$>
@@ -263,7 +285,7 @@ acknowledgeTick = A
 
 validYears :: IO (Set Integer)
 validYears = do
-    (y, mm, _) <- toGregorian . localDay <$> aocTime
+    (y, mm, _) <- toGregorian . localDay <$> aocServerTime
     let y' | mm >= 11  = y
            | otherwise = y - 1
     pure $ S.fromList [2015 .. y']

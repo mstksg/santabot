@@ -21,7 +21,6 @@ module Santabot.Bot (
   , mergeBots
   , simpleCommand
   , helpBot
-  , aocTime
   , intervals
   ) where
 
@@ -160,6 +159,3 @@ intervals = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
           forM_ x1_ $ \x1 -> do
             yield (x0 ... x1)
             go x1
-
-aocTime :: IO LocalTime
-aocTime = utcToLocalTime (read "EST") <$> getCurrentTime
