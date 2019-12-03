@@ -70,7 +70,7 @@ type Phrasebook = Set Text
 puzzleLink :: MonadIO m => Command m
 puzzleLink = C
     { cName  = "link"
-    , cHelp  = "Get the link to a given puzzle (!link 23, !link 2017 16).  If bad day or year given, just returns most recent match."
+    , cHelp  = "Get the link to a given puzzle with the puzzle title (!link 23, !link 2017 16).  If bad day or year given, just returns most recent match."
     , cParse = askLink
     , cResp  = \(y,d) -> liftIO $ fancyLink y d (displayLink y d)
     }
