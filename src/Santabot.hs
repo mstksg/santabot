@@ -88,9 +88,9 @@ puzzleThread = C
 
 fancyLink :: Integer -> Advent.Day -> String -> IO Text
 fancyLink y d url = do
-    title <- foldMap (" -- " <>) <$> dayTitle y d
+    title <- foldMap ([P.s|: "%s"|] . T.unpack) <$> dayTitle y d
     pure . T.pack $
-      [P.s|[%d Day %d] %s%s|] y (dayInt d) url (T.unpack title)
+      [P.s|[%d Day %d%s] %s|] y (dayInt d) title url
 
 askLink
     :: MonadIO m
