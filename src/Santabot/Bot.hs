@@ -185,12 +185,13 @@ risingEdgeAlert
     :: forall m a. MonadIO m
     => String                                   -- ^ cap log dir
     -> Int                                      -- ^ number of minutes between polls
+    -> Bool                                     -- ^ notice? (true) or action (false)
     -> (Integer -> Advent.Day -> m (Maybe a))   -- ^ trigger with Just when "on" detected
     -> (Integer -> Advent.Day -> a -> m Text)   -- ^ how to respond to /first/ 'Just'
     -> Alert m
-risingEdgeAlert capLog delay trigger response = A
+risingEdgeAlert capLog delay noticeMe trigger response = A
     { aTrigger = risingEdge
-    , aResp    = fmap (True,) . uncurry sendEdge
+    , aResp    = fmap (noticeMe,) . uncurry sendEdge
     }
   where
     logDir = "cache" </> capLog

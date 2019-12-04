@@ -212,7 +212,7 @@ eventCountdown = A
              | otherwise = "s"
 
 boardCapped :: MonadIO m => Alert m
-boardCapped = risingEdgeAlert "capped" 1 trigger response
+boardCapped = risingEdgeAlert "capped" 1 True trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
@@ -235,7 +235,7 @@ boardCapped = risingEdgeAlert "capped" 1 trigger response
           (dayInt d) timeString linkUrl'
 
 privateCapped :: MonadIO m => String -> Integer -> Alert m
-privateCapped tok lbid = risingEdgeAlert "private-capped" 5 trigger response
+privateCapped tok lbid = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
