@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -26,6 +27,7 @@ data Conf = Conf
     , cPassword    :: Maybe String
     , cSession     :: Maybe String
     , cLeaderboard :: Maybe Integer
+    , cJoinCode    :: Maybe String
     }
   deriving Generic
 
@@ -36,31 +38,31 @@ instance A.FromJSON Conf where
 
 masterBot :: Conf -> S.Set T.Text -> Bot IO ()
 masterBot Conf{..} phrasebook = runReaderC phrasebook . mergeBots $
-  [ commandBots
-      [ puzzleLink
-      , puzzleThread
-      , nextPuzzle
-      , intcodeBot
-      , simpleCommand "about" "Information about santabot" . addSantaPhrase $
-          "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
-      , simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
-          Just y <- S.lookupMax <$> liftIO validYears
-          pure . T.pack $
-            [P.s|Join the IRC Leaderboard! Code 382266-2c53e45d, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
-            y
-      , simpleCommand "time" "The current time on AoC servers" $ do
-          t <- liftIO aocServerTime
-          pure . T.pack $
-            [P.s|The current AoC server time is %s|]
-            (formatTime defaultTimeLocale rfc822DateFormat t)
-      ]
-  , alertBot cAlerts challengeCountdown
-  , alertBot cAlerts eventCountdown
-  , alertBot cAlerts boardCapped
-  , case (cSession, cLeaderboard) of
-      (Just s, Just l) -> alertBot cAlerts (privateCapped s l)
-      _                -> idBot
-  ]
+    [ commandBots $
+        [ puzzleLink
+        , puzzleThread
+        , nextPuzzle
+        , intcodeBot
+        , simpleCommand "about" "Information about santabot" . addSantaPhrase $
+            "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
+        , simpleCommand "time" "The current time on AoC servers" $ do
+            t <- liftIO aocServerTime
+            pure . T.pack $
+              [P.s|The current AoC server time is %s|]
+              (formatTime defaultTimeLocale rfc822DateFormat t)
+        ] ++ foldMap (:[]) (mkLeaderboard <$> cLeaderboard <*> cJoinCode)
+    , alertBot cAlerts challengeCountdown
+    , alertBot cAlerts eventCountdown
+    , alertBot cAlerts boardCapped
+    , maybe idBot (alertBot cAlerts) $
+          privateCapped <$> cSession <*> cLeaderboard
+    ]
+  where
+    mkLeaderboard lb jc = simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
+      Just y <- S.lookupMax <$> liftIO validYears
+      pure . T.pack $
+        [P.s|Join the IRC Leaderboard! Code %d-%s, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
+        lb jc y
 
 main :: IO ()
 main = do

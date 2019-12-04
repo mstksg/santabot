@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE LambdaCase                #-}
 {-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE ParallelListComp          #-}
 {-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE ScopedTypeVariables       #-}
@@ -211,19 +212,21 @@ eventCountdown = A
         suff | n == 1    = "" :: String
              | otherwise = "s"
 
+getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe UTCTime)
+getCapTime y d = liftIO $ do
+    t <- aocServerTime
+    putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
+                  y (dayInt d) (show t)
+    mlb <- either (const Nothing) Just <$>
+      runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
+    pure $ mlb >>= \lb -> do
+      guard $ fullDailyBoard lb
+      entries <- NE.nonEmpty . toList . dlbStar2 $ lb
+      pure $ maximum (fmap dlbmTime entries)
+
 boardCapped :: MonadIO m => Alert m
-boardCapped = risingEdgeAlert "capped" 1 True trigger response
+boardCapped = risingEdgeAlert "capped" 1 True getCapTime response
   where
-    trigger y d = liftIO $ do
-      t <- aocServerTime
-      putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
-                    y (dayInt d) (show t)
-      mlb <- either (const Nothing) Just <$>
-        runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
-      pure $ mlb >>= \lb -> do
-        guard $ fullDailyBoard lb
-        entries <- NE.nonEmpty . toList . dlbStar2 $ lb
-        pure $ maximum (fmap dlbmTime entries)
     response y d capTime = liftIO $ do
       linkUrl <- getPostLink y d
       let timeString = formatTime defaultTimeLocale "%H:%M:%S EST"
@@ -234,7 +237,11 @@ boardCapped = risingEdgeAlert "capped" 1 True trigger response
         [P.s|Leaderboard for Day %d is now capped at %s (%s)!|]
           (dayInt d) timeString linkUrl'
 
-privateCapped :: MonadIO m => String -> Integer -> Alert m
+privateCapped
+    :: MonadIO m
+    => String     -- ^ session key
+    -> Integer    -- ^ leaderboard ID
+    -> Alert m
 privateCapped tok lbid = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
@@ -250,17 +257,23 @@ privateCapped tok lbid = risingEdgeAlert "private-capped" 5 False trigger respon
                   M.singleton tt (lbmId, lbmName)
         guard $ M.size dayMap >= 10
         pure dayMap
-    response y d capMap = pure . T.pack $
-        [P.s|Congrats to the IRC Board Top 10 for %04d day %d! %s|]
-          y (dayInt d) (T.unpack lbString)
+    response y d capMap = do
+        globalCap <- getCapTime y d
+        pure . T.pack $
+          [P.s|Congrats to IRC Board Top 10 (!leaderboard) for %04d day %d! %s|]
+            y (dayInt d) (T.unpack (lbString globalCap))
       where
-        lbString = T.intercalate ", " . zipWith mkStr [(1::Int)..] . M.toList $ capMap
-        mkStr place (tt, (i, u)) = T.pack $ [P.s|[%d] %s (%s)|] place uString tString
+        lbString cap = T.intercalate ", " . zipWith mkStr [(1::Int)..] . M.toList $ capMap
           where
-            uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
-            tString = formatTime defaultTimeLocale "%H:%M:%S"
-                    . utcToLocalTime (read "EST")
-                    $ tt
+            mkStr place (tt, (i, u)) = T.pack $ [P.s|%s%d%s %s (%s)|] openb place closeb uString tString
+              where
+                uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
+                tString = formatTime defaultTimeLocale "%H:%M:%S"
+                        . utcToLocalTime (read "EST")
+                        $ tt
+                (openb, closeb) = case cap of
+                  Just cc | cc < tt -> ("[", "]")
+                  _                 -> ("{", "}")
 
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A
