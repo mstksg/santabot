@@ -55,7 +55,7 @@ masterBot Conf{..} phrasebook = runReaderC phrasebook . mergeBots $
     , alertBot cAlerts eventCountdown
     , alertBot cAlerts boardCapped
     , maybe idBot (alertBot cAlerts) $
-          privateCapped <$> cSession <*> cLeaderboard
+        privateCapped <$> cSession <*> cLeaderboard <*> cJoinCode
     ]
   where
     mkLeaderboard lb jc = simpleCommand "leaderboard" "IRC leaderboard" . (addSantaPhrase =<<) $ do
