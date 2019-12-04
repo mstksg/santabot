@@ -220,10 +220,10 @@ data CapState = CSEmpty     -- ^ file not even made yet
               | CSNeg       -- ^ file made but it is False
               | CSPos       -- ^ file made and it is True
 
-boardCapped :: (MonadIO m, MonadReader Phrasebook m) => Alert m
+boardCapped :: MonadIO m => Alert m
 boardCapped = A
     { aTrigger = risingEdge
-    , aResp    = fmap (True,) . addSantaPhrase <=< uncurry sendEdge
+    , aResp    = fmap (True,) . uncurry sendEdge
     }
   where
     logDir = "cache/capped"
