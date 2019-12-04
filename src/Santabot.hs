@@ -76,10 +76,9 @@ puzzleThread = C
     { cName  = "thread"
     , cHelp  = "Get the link to a given puzzle's reddit discussion thread (!thread 23, !thread 2017 16).  If bad day or year given, just returns most recent match."
     , cParse = askLink
-    , cResp  = \(y,d) -> liftIO $ do
-        getPostLink y d >>= \case
-          Nothing -> pure "Thread not available, sorry!"
-          Just u  -> fancyLink y d u
+    , cResp  = \(y,d) -> liftIO $ getPostLink y d >>= \case
+        Nothing -> pure "Thread not available, sorry!"
+        Just u  -> fancyLink y d u
     }
 
 fancyLink :: Integer -> Advent.Day -> String -> IO Text
@@ -222,7 +221,8 @@ getCapTime y d = liftIO $ do
     pure $ mlb >>= \lb -> do
       guard $ fullDailyBoard lb
       entries <- NE.nonEmpty . toList . dlbStar2 $ lb
-      pure $ maximum (fmap dlbmTime entries)
+      let times = zonedTimeToUTC . dlbmCompleteTime y d . dlbmDecTime <$> entries
+      pure $ maximum times
 
 boardCapped :: MonadIO m => Alert m
 boardCapped = risingEdgeAlert "capped" 1 True getCapTime response
@@ -243,7 +243,7 @@ privateCapped
     -> Integer    -- ^ leaderboard ID
     -> String     -- ^ leaderboard join code
     -> Alert m
-privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigger response
+privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 1 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
@@ -260,11 +260,14 @@ privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigg
         pure dayMap
     response y d capMap = do
         globalCap <- getCapTime y d
+        liftIO $ print globalCap
         pure . T.pack $
-          [P.s|Congrats to IRC Board Top 10 (%d-%s) of %04d day %d! %s|]
+          [P.s|Congrats to IRC Board (%d-%s) Top 10 of %04d day %d! %s|]
             lbid joinCode y (dayInt d) (T.unpack (lbString globalCap))
       where
-        lbString cap = T.intercalate ", " . zipWith mkStr [(1::Int)..] . M.toList $ capMap
+        lbString cap = T.intercalate ", "
+                     . zipWith mkStr [(1::Int)..]
+                     . M.toList $ capMap
           where
             mkStr place (tt, (i, u)) = T.pack $ [P.s|%s%d%s %s (%s)|] openb place closeb uString tString
               where

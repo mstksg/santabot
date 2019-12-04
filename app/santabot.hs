@@ -16,6 +16,8 @@ import           Santabot.Run
 import qualified Data.Aeson              as A
 import qualified Data.Set                as S
 import qualified Data.Text               as T
+import qualified Data.Text.Encoding      as T
+import qualified Data.Text.IO            as T
 import qualified Data.Yaml               as Y
 import qualified Language.Haskell.Printf as P
 
@@ -33,6 +35,11 @@ data Conf = Conf
 
 instance A.FromJSON Conf where
     parseJSON = A.genericParseJSON A.defaultOptions
+      { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
+      }
+
+instance A.ToJSON Conf where
+    toJSON = A.genericToJSON A.defaultOptions
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
@@ -67,6 +74,7 @@ masterBot Conf{..} phrasebook = runReaderC phrasebook . mergeBots $
 main :: IO ()
 main = do
     c@Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
+    T.putStrLn . T.decodeUtf8 . Y.encode $ c
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
     launchIRC cChannels cNick cPassword (cTick * 1000000)
         (masterBot c phrasebook)
