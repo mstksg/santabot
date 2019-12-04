@@ -241,9 +241,9 @@ privateCapped
     :: MonadIO m
     => String     -- ^ session key
     -> Integer    -- ^ leaderboard ID
-    -> String     -- ^ leaderboard join code
+    -> Maybe String     -- ^ leaderboard join code
     -> Alert m
-privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 1 False trigger response
+privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
@@ -262,8 +262,9 @@ privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 1 False trigg
         globalCap <- getCapTime y d
         liftIO $ print globalCap
         pure . T.pack $
-          [P.s|Congrats to IRC Board (%d-%s) Top 10 of %04d day %d! %s|]
-            lbid joinCode y (dayInt d) (T.unpack (lbString globalCap))
+          [P.s|Congrats to IRC Board (%d%s) Top 10 of %04d day %d! %s|]
+            lbid (foldMap ("-" <>) joinCode)
+            y (dayInt d) (T.unpack (lbString globalCap))
       where
         lbString cap = T.intercalate ", "
                      . zipWith mkStr [(1::Int)..]
