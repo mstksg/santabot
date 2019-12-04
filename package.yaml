@@ -27,11 +27,11 @@ ghc-options:
 
 dependencies:
 - base >= 4.7 && < 5
+- advent-of-code-api >= 0.2.6.2
 
 library:
   source-dirs: src
   dependencies:
-  - advent-of-code-api >= 0.2.6.1
   - bytestring
   - conduit
   - containers
@@ -71,7 +71,6 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - advent-of-code-api >= 0.2.6.1
     - aeson
     - conduit
     - containers
