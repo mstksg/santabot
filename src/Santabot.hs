@@ -27,7 +27,6 @@ module Santabot (
 
 import           Advent
 import           Advent.API                 as Advent
-import           Advent.Cache
 import           Advent.Reddit
 import           Advent.Types
 import           Conduit
@@ -39,7 +38,6 @@ import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
-import           Data.Functor
 import           Data.Map                   (Map)
 import           Data.Maybe
 import           Data.Set                   (Set)
@@ -50,8 +48,6 @@ import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
 import           Servant.Links
-import           System.Directory
-import           System.FilePath
 import           System.Random
 import           Text.Megaparsec
 import           Text.Read                  (readMaybe)
@@ -60,8 +56,6 @@ import qualified Data.List.NonEmpty         as NE
 import qualified Data.Map                   as M
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Yaml                  as Y
 import qualified Language.Haskell.Printf    as P
 import qualified Numeric.Interval           as I
 import qualified Text.Megaparsec.Char.Lexer as P
@@ -217,49 +211,10 @@ eventCountdown = A
         suff | n == 1    = "" :: String
              | otherwise = "s"
 
-data CapState = CSEmpty     -- ^ file not even made yet
-              | CSNeg       -- ^ file made but it is False
-              | CSPos       -- ^ file made and it is True
-
 boardCapped :: MonadIO m => Alert m
-boardCapped = A
-    { aTrigger = risingEdge
-    , aResp    = fmap (True,) . uncurry sendEdge
-    }
+boardCapped = risingEdgeAlert "capped" 1 trigger response
   where
-    logDir = "cache/capped"
-    risingEdge i@(I.sup->isup) = runMaybeT $ do
-        liftIO $ createDirectoryIfMissing True logDir
-        guard $ mm == 12
-        guard $ everyMinute `I.member` i
-        d' <- maybe empty pure $ mkDay (fromIntegral dd)
-        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
-        liftIO (getCapState logFP) >>= \case
-          CSPos   -> empty
-          CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
-          CSNeg   -> do
-            capTime <- MaybeT . liftIO $ leaderboardCapTime yy d'
-            pure (capTime, (logFP, (yy, d')))
-      where
-        TimeOfDay hh uu _ = localTimeOfDay isup
-        everyMinute       = isup { localTimeOfDay = TimeOfDay hh uu 0 }
-        d                 = localDay isup
-        (yy,mm,dd)        = toGregorian d
-    sendEdge capTime (logFP, (y, d)) = liftIO $ do
-        Y.encodeFile logFP True
-        linkUrl  <- getPostLink y d
-        let timeString = formatTime defaultTimeLocale "%H:%M:%S EST"
-                       . utcToLocalTime (read "EST")
-                       $ capTime
-            linkUrl'    = case linkUrl of
-                            Nothing -> "thread not yet available"
-                            Just u  -> u
-        pure . T.pack $
-          [P.s|Leaderboard for Day %d is now capped at %s (%s)!|]
-            (dayInt d) timeString linkUrl'
-      where
-    leaderboardCapTime :: Integer -> Advent.Day -> IO (Maybe UTCTime)
-    leaderboardCapTime y d = do
+    trigger y d = liftIO $ do
       t <- aocServerTime
       putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
@@ -269,52 +224,20 @@ boardCapped = A
         guard $ fullDailyBoard lb
         entries <- NE.nonEmpty . toList . dlbStar2 $ lb
         pure $ maximum (fmap dlbmTime entries)
-    getCapState l = readFileMaybe l <&> \case
-      Nothing -> CSEmpty
-      Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
-        Left _      -> CSEmpty
-        Right False -> CSNeg
-        Right True  -> CSPos
+    response y d capTime = liftIO $ do
+      linkUrl <- getPostLink y d
+      let timeString = formatTime defaultTimeLocale "%H:%M:%S EST"
+                     . utcToLocalTime (read "EST")
+                     $ capTime
+          linkUrl'   = fromMaybe "thread not yet available" linkUrl
+      pure . T.pack $
+        [P.s|Leaderboard for Day %d is now capped at %s (%s)!|]
+          (dayInt d) timeString linkUrl'
 
 privateCapped :: MonadIO m => String -> Integer -> Alert m
-privateCapped tok lbid = A
-    { aTrigger = risingEdge
-    , aResp    = fmap (True,) . uncurry sendEdge
-    }
+privateCapped tok lbid = risingEdgeAlert "private-capped" 5 trigger response
   where
-    logDir = "cache/private-capped"
-    risingEdge i@(I.sup->isup) = runMaybeT $ do
-        liftIO $ createDirectoryIfMissing True logDir
-        guard $ mm == 12
-        guard $ everyFiveMinutes `I.member` i
-        d' <- maybe empty pure $ mkDay (fromIntegral dd)
-        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
-        liftIO (getCapState logFP) >>= \case
-          CSPos   -> empty
-          CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
-          CSNeg   -> do
-            capResult <- MaybeT . liftIO $ leaderboardCapTime yy d'
-            pure (capResult, (logFP, (yy, d')))
-      where
-        TimeOfDay hh uu _ = localTimeOfDay isup
-        everyFiveMinutes  = isup { localTimeOfDay = TimeOfDay hh ((uu `div` 5) * 5) 0 }
-        d                 = localDay isup
-        (yy,mm,dd)        = toGregorian d
-    sendEdge capMap (logFP, (y, d)) = liftIO $ do
-        Y.encodeFile logFP True
-        let lbString = T.intercalate ", " . map mkStr . zip [(1::Int)..] . M.toList $ capMap
-            mkStr (place, (tt, (i, u))) = T.pack $ [P.s|[%d] %s (%s)|] place uString tString
-              where
-                uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
-                tString = formatTime defaultTimeLocale "%H:%M:%S"
-                        . utcToLocalTime (read "EST")
-                        $ tt
-        pure . T.pack $
-          [P.s|Congrats to the IRC Board Top 10 for %04d day %d! %s|]
-            y (dayInt d) (T.unpack lbString)
-      where
-    leaderboardCapTime :: Integer -> Advent.Day -> IO (Maybe (Map UTCTime (Integer, Maybe Text)))
-    leaderboardCapTime y d = do
+    trigger y d = liftIO $ do
       t <- aocServerTime
       putStrLn $ [P.s|[PRIVATE CAP DETECTION] Getting private leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
@@ -327,12 +250,17 @@ privateCapped tok lbid = A
                   M.singleton tt (lbmId, lbmName)
         guard $ M.size dayMap >= 10
         pure dayMap
-    getCapState l = readFileMaybe l <&> \case
-      Nothing -> CSEmpty
-      Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
-        Left _      -> CSEmpty
-        Right False -> CSNeg
-        Right True  -> CSPos
+    response y d capMap = pure . T.pack $
+        [P.s|Congrats to the IRC Board Top 10 for %04d day %d! %s|]
+          y (dayInt d) (T.unpack lbString)
+      where
+        lbString = T.intercalate ", " . zipWith mkStr [(1::Int)..] . M.toList $ capMap
+        mkStr place (tt, (i, u)) = T.pack $ [P.s|[%d] %s (%s)|] place uString tString
+          where
+            uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
+            tString = formatTime defaultTimeLocale "%H:%M:%S"
+                    . utcToLocalTime (read "EST")
+                    $ tt
 
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A

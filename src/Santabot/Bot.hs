@@ -6,6 +6,7 @@
 {-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE TupleSections             #-}
 {-# LANGUAGE TypeInType                #-}
+{-# LANGUAGE ViewPatterns              #-}
 
 module Santabot.Bot (
     Message(..)
@@ -18,6 +19,7 @@ module Santabot.Bot (
   , commandBot
   , commandBots
   , alertBot
+  , risingEdgeAlert
   , mergeBots
   , simpleCommand
   , helpBot
@@ -25,16 +27,25 @@ module Santabot.Bot (
   , idBot
   ) where
 
+import           Advent
+import           Advent.Cache
 import           Conduit
-import           Data.Foldable
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.Trans.Maybe
 import           Data.Functor
-import           Data.Text                (Text)
-import           Data.Time                as Time
-import           Numeric.Interval         (Interval, (...))
-import qualified Data.Conduit.Combinators as C
-import qualified Data.Map                 as M
-import qualified Data.Text                as T
-import qualified Language.Haskell.Printf  as P
+import           Data.Text                 (Text)
+import           Data.Time                 as Time
+import           Numeric.Interval          (Interval, (...))
+import           System.Directory
+import           System.FilePath
+import qualified Data.Conduit.Combinators  as C
+import qualified Data.Map                  as M
+import qualified Data.Text                 as T
+import qualified Data.Text.Encoding        as T
+import qualified Data.Yaml                 as Y
+import qualified Language.Haskell.Printf   as P
+import qualified Numeric.Interval          as I
 
 data Message = M { mRoom :: String
                  , mUser :: String
@@ -164,3 +175,48 @@ intervals = C.concatMap (\e -> [ t | ETick t <- Just e ] :: Maybe LocalTime)
           forM_ x1_ $ \x1 -> do
             yield (x0 ... x1)
             go x1
+
+data CapState = CSEmpty     -- ^ file not even made yet
+              | CSNeg       -- ^ file made but it is False
+              | CSPos       -- ^ file made and it is True
+
+-- | Generalized way to make an 'Alert' for a "rising edge" event.
+risingEdgeAlert
+    :: forall m a. MonadIO m
+    => String                                   -- ^ cap log dir
+    -> Int                                      -- ^ number of minutes between polls
+    -> (Integer -> Advent.Day -> m (Maybe a))   -- ^ trigger with Just when "on" detected
+    -> (Integer -> Advent.Day -> a -> m Text)   -- ^ how to respond to /first/ 'Just'
+    -> Alert m
+risingEdgeAlert capLog delay trigger response = A
+    { aTrigger = risingEdge
+    , aResp    = fmap (True,) . uncurry sendEdge
+    }
+  where
+    logDir = "cache" </> capLog
+    risingEdge i@(I.sup->isup) = runMaybeT $ do
+        liftIO $ createDirectoryIfMissing True logDir
+        guard $ mm == 12
+        guard $ withDelay `I.member` i
+        d' <- maybe empty pure $ mkDay (fromIntegral dd)
+        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
+        liftIO (getCapState logFP) >>= \case
+          CSPos   -> empty
+          CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
+          CSNeg   -> do
+            trigRes <- MaybeT $ trigger yy d'
+            pure (trigRes, (logFP, (yy, d')))
+      where
+        TimeOfDay hh uu _ = localTimeOfDay isup
+        withDelay         = isup { localTimeOfDay = TimeOfDay hh ((uu `div` delay) * delay) 0 }
+        d                 = localDay isup
+        (yy,mm,dd)        = toGregorian d
+    sendEdge trigRes (logFP, (y, d)) = do
+        liftIO $ Y.encodeFile logFP True
+        response y d trigRes
+    getCapState l = readFileMaybe l <&> \case
+      Nothing -> CSEmpty
+      Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
+        Left _      -> CSEmpty
+        Right False -> CSNeg
+        Right True  -> CSPos
