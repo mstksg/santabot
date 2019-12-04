@@ -19,11 +19,13 @@ import qualified Data.Yaml               as Y
 import qualified Language.Haskell.Printf as P
 
 data Conf = Conf
-    { cChannels :: [String]
-    , cAlerts   :: String
-    , cTick     :: Int              -- ^ in seconds
-    , cNick     :: String
-    , cPassword :: Maybe String
+    { cChannels    :: [String]
+    , cAlerts      :: String
+    , cTick        :: Int              -- ^ in seconds
+    , cNick        :: String
+    , cPassword    :: Maybe String
+    , cSession     :: Maybe String
+    , cLeaderboard :: Maybe Integer
     }
   deriving Generic
 
@@ -32,8 +34,8 @@ instance A.FromJSON Conf where
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
-masterBot :: Phrasebook -> String -> Bot IO ()
-masterBot phrasebook alerts = runReaderC phrasebook . mergeBots $
+masterBot :: Conf -> S.Set T.Text -> Bot IO ()
+masterBot Conf{..} phrasebook = runReaderC phrasebook . mergeBots $
   [ commandBots
       [ puzzleLink
       , puzzleThread
@@ -52,14 +54,17 @@ masterBot phrasebook alerts = runReaderC phrasebook . mergeBots $
             [P.s|The current AoC server time is %s|]
             (formatTime defaultTimeLocale rfc822DateFormat t)
       ]
-  , alertBot alerts challengeCountdown
-  , alertBot alerts eventCountdown
-  , alertBot alerts boardCapped
+  , alertBot cAlerts challengeCountdown
+  , alertBot cAlerts eventCountdown
+  , alertBot cAlerts boardCapped
+  , case (cSession, cLeaderboard) of
+      (Just s, Just l) -> alertBot cAlerts (privateCapped s l)
+      _                -> idBot
   ]
 
 main :: IO ()
 main = do
-    Conf{..}   <- Y.decodeFileThrow "santabot-conf.yaml"
+    c@Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
     launchIRC cChannels cNick cPassword (cTick * 1000000)
-        (masterBot phrasebook cAlerts)
+        (masterBot c phrasebook)

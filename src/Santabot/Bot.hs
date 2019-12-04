@@ -22,6 +22,7 @@ module Santabot.Bot (
   , simpleCommand
   , helpBot
   , intervals
+  , idBot
   ) where
 
 import           Conduit
@@ -60,6 +61,10 @@ type Bot = ConduitT Event Resp
 
 mergeBots :: Monad m => [Bot m ()] -> Bot m ()
 mergeBots = void . sequenceConduits
+
+-- | The bot that does nothing
+idBot :: Bot m ()
+idBot = pure ()
 
 data Command m = forall a. C
     { cName  :: String

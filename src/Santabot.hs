@@ -17,6 +17,7 @@ module Santabot (
   , challengeCountdown
   , eventCountdown
   , boardCapped
+  , privateCapped
   , acknowledgeTick
   , Phrasebook
   , addSantaPhrase
@@ -268,7 +269,6 @@ boardCapped = A
         guard $ fullDailyBoard lb
         entries <- NE.nonEmpty . toList . dlbStar2 $ lb
         pure $ maximum (fmap dlbmTime entries)
-
     getCapState l = readFileMaybe l <&> \case
       Nothing -> CSEmpty
       Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
@@ -276,6 +276,63 @@ boardCapped = A
         Right False -> CSNeg
         Right True  -> CSPos
 
+privateCapped :: MonadIO m => String -> Integer -> Alert m
+privateCapped tok lbid = A
+    { aTrigger = risingEdge
+    , aResp    = fmap (True,) . uncurry sendEdge
+    }
+  where
+    logDir = "cache/private-capped"
+    risingEdge i@(I.sup->isup) = runMaybeT $ do
+        liftIO $ createDirectoryIfMissing True logDir
+        guard $ mm == 12
+        guard $ everyFiveMinutes `I.member` i
+        d' <- maybe empty pure $ mkDay (fromIntegral dd)
+        let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
+        liftIO (getCapState logFP) >>= \case
+          CSPos   -> empty
+          CSEmpty -> liftIO (Y.encodeFile logFP False) *> empty
+          CSNeg   -> do
+            capResult <- MaybeT . liftIO $ leaderboardCapTime yy d'
+            pure (capResult, (logFP, (yy, d')))
+      where
+        TimeOfDay hh uu _ = localTimeOfDay isup
+        everyFiveMinutes  = isup { localTimeOfDay = TimeOfDay hh ((uu `div` 5) * 5) 0 }
+        d                 = localDay isup
+        (yy,mm,dd)        = toGregorian d
+    sendEdge capMap (logFP, (y, d)) = liftIO $ do
+        Y.encodeFile logFP True
+        let lbString = T.intercalate ", " . map mkStr . zip [(1::Int)..] . M.toList $ capMap
+            mkStr (place, (tt, (i, u))) = T.pack $ [P.s|[%d] %s (%s)|] place uString tString
+              where
+                uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
+                tString = formatTime defaultTimeLocale "%H:%M:%S"
+                        . utcToLocalTime (read "EST")
+                        $ tt
+        pure . T.pack $
+          [P.s|Congrats to the IRC Board Top 10 for %04d day %d! %s|]
+            y (dayInt d) (T.unpack lbString)
+      where
+    leaderboardCapTime :: Integer -> Advent.Day -> IO (Maybe (Map UTCTime (Integer, Maybe Text)))
+    leaderboardCapTime y d = do
+      t <- aocServerTime
+      putStrLn $ [P.s|[PRIVATE CAP DETECTION] Getting private leaderboard cap time for %04d %d at %s|]
+                    y (dayInt d) (show t)
+      mlb <- either (const Nothing) Just <$>
+        runAoC (defaultAoCOpts y tok) (AoCLeaderboard lbid)
+      pure $ mlb >>= \lb -> do
+        let dayMap = M.take 10 . flip foldMap (lbMembers lb) $ \LBM{..} ->
+              flip foldMap (M.lookup d lbmCompletion) $ \pts ->
+                flip foldMap (M.lookup Part2 pts) $ \tt ->
+                  M.singleton tt (lbmId, lbmName)
+        guard $ M.size dayMap >= 10
+        pure dayMap
+    getCapState l = readFileMaybe l <&> \case
+      Nothing -> CSEmpty
+      Just x  -> case Y.decodeEither' (T.encodeUtf8 x) of
+        Left _      -> CSEmpty
+        Right False -> CSNeg
+        Right True  -> CSPos
 
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A
