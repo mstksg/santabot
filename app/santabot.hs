@@ -55,7 +55,7 @@ masterBot Conf{..} phrasebook = runReaderC phrasebook . mergeBots $
         , simpleCommand "time" "The current time on AoC servers" $ do
             t <- liftIO aocServerTime
             pure . T.pack $
-              [P.s|The current AoC server time is %s|]
+              [P.s|The current AoC server time (EST) is %s|]
               (formatTime defaultTimeLocale rfc822DateFormat t)
         ] ++ foldMap (:[]) (mkLeaderboard <$> cLeaderboard <*> cJoinCode)
     , alertBot cAlerts challengeCountdown
