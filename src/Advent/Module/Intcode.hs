@@ -87,7 +87,7 @@ validNick = validNick1 <> S.fromList ('-':['0'..'9'])
 data Paused = Paused (Int -> VM) Memory
 
 maxFuel :: Int
-maxFuel = 1024
+maxFuel = 10000
 
 intcodeBot :: MonadIO m => IORef (Map Nick Paused) -> Command m
 intcodeBot v = C
@@ -129,13 +129,15 @@ intcodeBot v = C
         Left next -> do
           writeIORef v $ M.insert (Nick user) (Paused next m') curr
           pure $
-            [P.s|%s... awaiting input (!intcode push %s <inp> to continue)|]
+            [P.s|%s... awaiting input (!intcode push %s <inp> to continue) (%d fuel remaining)|]
               (displayOutput outs)
               user
+              (mFuel m')
         Right () -> pure $
-            [P.s|%s; halt, @0 = %d|]
+            [P.s|%s; halt, @0 = %d; %d fuel unused|]
               (displayOutput outs)
               (NESeq.head (mRegs m'))
+              (mFuel m')
 
 unrollPipe
     :: Monad m
