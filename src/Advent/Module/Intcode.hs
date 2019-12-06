@@ -15,7 +15,7 @@ module Advent.Module.Intcode (
   ) where
 
 import           Advent.Module.Intcode.VM
-import           Control.Applicative hiding         (many)
+import           Control.Applicative hiding         (many, some)
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Free
@@ -28,6 +28,7 @@ import           Data.List
 import           Data.List.NonEmpty                 (NonEmpty(..))
 import           Data.Map                           (Map)
 import           Data.Semigroup
+import           Data.Sequence.NonEmpty             (NESeq)
 import           Data.Set                           (Set)
 import           Data.Text                          (Text)
 import           Data.Void
@@ -44,7 +45,7 @@ import qualified Text.Megaparsec.Char.Lexer         as L
 
 type Parser = Parsec Void Text
 
-data ICom = ICLaunch [Int] Memory
+data ICom = ICLaunch [Int] (Either (NESeq Int) String)      -- pastebin id
           | ICPush   Nick (NonEmpty Int)
           -- | ICPipe   Nick Nick
           | ICClear
@@ -68,8 +69,11 @@ parseCom = asum
     parseList = number `sepBy` optional (lexeme ",")
     parseNE :: Parser (NonEmpty Int)
     parseNE = number `NE.sepBy1` optional (lexeme ",")
-    parseMemory :: Parser Memory
-    parseMemory = Mem maxFuel 0 . NESeq.fromList <$> parseNE
+    parseMemory :: Parser (Either (NESeq Int) String)
+    parseMemory = (Left  <$> (NESeq.fromList <$> parseNE))
+              <|> (Right <$> gistLink)
+    gistLink :: Parser String
+    gistLink = lexeme (some (satisfy (`S.member` validPastebin)))
     parseNick :: Parser Nick
     parseNick = fmap Nick . lexeme $
       (:) <$> satisfy (`S.member` validNick1)
@@ -84,10 +88,16 @@ validNick1 = S.fromList $
 validNick :: Set Char
 validNick = validNick1 <> S.fromList ('-':['0'..'9'])
 
+validPastebin :: Set Char
+validPastebin = S.fromList $
+     ['A'..'Z']
+  ++ ['a'..'z']
+  ++ ['0'..'9']
+
 data Paused = Paused (Int -> VM) Memory
 
 maxFuel :: Int
-maxFuel = 10000
+maxFuel = 100000
 
 intcodeBot :: MonadIO m => IORef (Map Nick Paused) -> Command m
 intcodeBot v = C
@@ -98,12 +108,16 @@ intcodeBot v = C
           Left  _ -> Left "could not parse command"
           Right r -> Right (mUser msg, r)
     , cResp  = uncurry $ \user -> \case
-        ICLaunch inps m -> fmap T.pack . liftIO $ do
-          curr <- readIORef v
-          if Nick user `M.member` curr
-            then pure $
-                  [P.s|%s currently has a running thread. !intcode clear to delete.|] user
-            else handleOut user curr $ runStateT (feedPipe inps stepForever) m
+        ICLaunch inps (Left regs) ->
+          let m = Mem maxFuel 0 regs
+          in  fmap T.pack . liftIO $ do
+                curr <- readIORef v
+                if Nick user `M.member` curr
+                  then pure $
+                        [P.s|%s currently has a running thread. !intcode clear to delete.|] user
+                  else handleOut user curr $ runStateT (feedPipe inps stepForever) m
+        ICLaunch _ (Right link) -> pure . T.pack $
+          [P.s|Loading pastebin %s ... jk, this isn't implemented yet|] link
         ICPush nk (i :| is) -> fmap T.pack . liftIO $ do
           curr <- atomicModifyIORef v $ \mp -> (M.delete nk mp, mp)
           case nk `M.lookup` curr of
