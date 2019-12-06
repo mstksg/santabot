@@ -20,6 +20,7 @@ import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Free
 import           Data.Bifunctor
+import           Data.Char
 import           Data.Conduino
 import           Data.Conduino.Internal
 import           Data.Foldable
@@ -135,8 +136,11 @@ intcodeBot v = C
     }
   where
     displayOutput out
-      | null out  = "<no output>"
-      | otherwise = "output: " ++ intercalate "," (map show out)
+        | null out         = "<no output>"
+        | all isPrint out' = "output: " ++ out'
+        | otherwise        = "output: " ++ intercalate "," (map show out)
+      where
+        out' = map chr out
     handleOut user curr = \case
       Left e                  -> pure $ [P.s|error: %s|] e
       Right ((outs, res), m') -> case res of
