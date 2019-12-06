@@ -61,6 +61,10 @@ library:
   - transformers
   - uri-bytestring
   - yaml
+  - machines
+  - linear
+  - conduino
+  - free
 
 executables:
   santabot:

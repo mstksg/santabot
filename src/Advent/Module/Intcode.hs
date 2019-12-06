@@ -1,67 +1,158 @@
-{-# LANGUAGE LambdaCase        #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
+{-# LANGUAGE BangPatterns              #-}
+{-# LANGUAGE EmptyCase                 #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE FlexibleContexts          #-}
+{-# LANGUAGE LambdaCase                #-}
+{-# LANGUAGE OverloadedStrings         #-}
+{-# LANGUAGE QuasiQuotes               #-}
+{-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE TupleSections             #-}
 
 module Advent.Module.Intcode (
     intcodeBot
-  , parseIntcode
-  , runIntcode
+  , parseCom
+  , Paused
   ) where
 
+import           Advent.Module.Intcode.VM
+import           Control.Applicative hiding         (many)
+import           Control.Monad.Except
+import           Control.Monad.State
+import           Control.Monad.Trans.Free
 import           Data.Bifunctor
-import           Data.Sequence.NonEmpty  (NESeq(..))
+import           Data.Conduino
+import           Data.Conduino.Internal
+import           Data.Foldable
+import           Data.IORef
+import           Data.List
+import           Data.List.NonEmpty                 (NonEmpty(..))
+import           Data.Map                           (Map)
+import           Data.Semigroup
+import           Data.Set                           (Set)
+import           Data.Text                          (Text)
+import           Data.Void
 import           Santabot.Bot
-import qualified Data.List.NonEmpty      as NE
-import qualified Data.Sequence.NonEmpty  as NESeq
-import qualified Data.Text               as T
-import qualified Data.Text.Read          as T
-import qualified Language.Haskell.Printf as P
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
+import qualified Control.Monad.Combinators.NonEmpty as NE
+import qualified Data.Map                           as M
+import qualified Data.Sequence.NonEmpty             as NESeq
+import qualified Data.Set                           as S
+import qualified Data.Text                          as T
+import qualified Language.Haskell.Printf            as P
+import qualified Text.Megaparsec.Char.Lexer         as L
 
-data Memory = Mem
-    { mPos  :: !Int
-    , mRegs :: !(NESeq Int)
-    }
+type Parser = Parsec Void Text
+
+data ICom = ICLaunch [Int] Memory
+          | ICPush   Nick (NonEmpty Int)
+          -- | ICPipe   Nick Nick
+          | ICClear
+          | ICHelp
   deriving Show
 
-m2e :: e -> Maybe a -> Either e a
-m2e e = maybe (Left e) Right
-
-step :: Memory -> Either (Maybe String) Memory
-step (Mem p r) = do
-    x <- look p
-    o <- case x of
-      1  -> pure (+)
-      2  -> pure (*)
-      99 -> Left Nothing
-      _  -> Left . Just $ [P.s|invalid opcode: %d|] x
-    a <- look (p + 1)
-    b <- look (p + 2)
-    c <- look (p + 3)
-    y <- look a
-    z <- look b
-    pure $ Mem (p + 4) (NESeq.update c (o y z) r)
+parseCom :: Parser ICom
+parseCom = asum
+     [ try $ ICLaunch <$> (parseList <* lexeme "|") <*> parseMemory
+     , try $ ICLaunch [] <$> parseMemory
+     , try $ ICPush  <$> (lexeme "push" *> parseNick) <*> parseNE
+     -- , try $ ICPipe  <$> (lexeme "pipe" *> parseNick) <*> parseNick
+     , try $ ICClear <$  lexeme "clear"
+     , try $ ICHelp  <$  lexeme "help"
+     ] <* eof
   where
-    look i = m2e (Just $ [P.s|out of bounds: %d|] i) $
-               NESeq.lookup i r
+    lexeme    = L.lexeme space
+    number    :: Parser Int
+    number    = lexeme $ L.signed (pure ()) L.decimal
+    parseList :: Parser [Int]
+    parseList = number `sepBy` optional (lexeme ",")
+    parseNE :: Parser (NonEmpty Int)
+    parseNE = number `NE.sepBy1` optional (lexeme ",")
+    parseMemory :: Parser Memory
+    parseMemory = Mem maxFuel 0 . NESeq.fromList <$> parseNE
+    parseNick :: Parser Nick
+    parseNick = fmap Nick . lexeme $
+      (:) <$> satisfy (`S.member` validNick1)
+          <*> many (satisfy (`S.member` validNick))
 
-runIntcode :: Memory -> Either String Int
-runIntcode m = case step m of
-    Left Nothing  -> Right $ NESeq.head (mRegs m)
-    Left (Just e) -> Left $ "errored with: " ++ e
-    Right m'  -> runIntcode m'
+validNick1 :: Set Char
+validNick1 = S.fromList $
+     ['A'..'Z']
+  ++ ['a'..'z']
+  ++ "`|^_{}[]\\"
 
-parseIntcode :: T.Text -> Either String Memory
-parseIntcode str = do
-    xs <- m2e "empty register" . NE.nonEmpty . T.splitOn "," $ str
-    rs <- first (const "could not parse integer")
-        . traverse (fmap fst . T.signed T.decimal . T.strip)
-        $ xs
-    pure $ Mem 0 (NESeq.fromList rs)
+validNick :: Set Char
+validNick = validNick1 <> S.fromList ('-':['0'..'9'])
 
-intcodeBot :: Applicative m => Command m
-intcodeBot = C
+data Paused = Paused (Int -> VM) Memory
+
+maxFuel :: Int
+maxFuel = 1024
+
+intcodeBot :: MonadIO m => IORef (Map Nick Paused) -> Command m
+intcodeBot v = C
     { cName  = "intcode"
-    , cHelp  = "Run arbitrary intcode (2019 Day 2) and try to crash jle`'s digial ocean droplet"
-    , cParse = pure . first (("parse error: " <>) . T.pack) . parseIntcode . mBody
-    , cResp  = pure . T.pack . either id [P.s|halted with position 0 = %d|] . runIntcode
+    , cHelp  = T.pack $ [P.s|Launch or interact with an intcode (2019 Days 2 & 5) process; max runtime %d instr. !intcode help for commands|]
+                  maxFuel
+    , cParse = \msg -> pure $ case runParser parseCom "" (mBody msg) of
+          Left  _ -> Left "could not parse command"
+          Right r -> Right (mUser msg, r)
+    , cResp  = uncurry $ \user -> \case
+        ICLaunch inps m -> fmap T.pack . liftIO $ do
+          curr <- readIORef v
+          if Nick user `M.member` curr
+            then pure $
+                  [P.s|%s currently has a running thread. !intcode clear to delete.|] user
+            else handleOut user curr $ runStateT (feedPipe inps stepForever) m
+        ICPush nk (i :| is) -> fmap T.pack . liftIO $ do
+          curr <- atomicModifyIORef v $ \mp -> (M.delete nk mp, mp)
+          case nk `M.lookup` curr of
+            Nothing              ->
+              pure $ [P.s|No thread for %s found|] (unNick nk)
+            Just (Paused next m) ->
+              handleOut user curr $ runStateT (feedPipe is (next i)) m
+        ICClear -> liftIO . atomicModifyIORef v $ \mp ->
+          let (Any found, mp') = M.alterF (const (Any True, Nothing)) (Nick user) mp
+          in  (mp',) . T.pack $ if found
+                then [P.s|Thread %s deleted|] user
+                else [P.s|No thread for %s found|] user
+        -- ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; pipe <id> <id>; clear; help"
+        ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; clear; help"
     }
+  where
+    displayOutput out
+      | null out  = "<no output>"
+      | otherwise = "output: " ++ intercalate "," (map show out)
+    handleOut user curr = \case
+      Left e                  -> pure $ [P.s|error: %s|] e
+      Right ((outs, res), m') -> case res of
+        Left next -> do
+          writeIORef v $ M.insert (Nick user) (Paused next m') curr
+          pure $
+            [P.s|%s... awaiting input (!intcode push %s <inp> to continue)|]
+              (displayOutput outs)
+              user
+        Right () -> pure $
+            [P.s|%s; halt, @0 = %d|]
+              (displayOutput outs)
+              (NESeq.head (mRegs m'))
+
+unrollPipe
+    :: Monad m
+    => Pipe i o u m a
+    -> m (FreeF (PipeF i o u) a (Pipe i o u m a))
+unrollPipe = (fmap . fmap) fromRecPipe . runFreeT . toRecPipe
+
+feedPipe
+    :: Monad m
+    => [i]
+    -> Pipe i o u m a
+    -> m ([o], Either (i -> Pipe i o u m a) a)
+feedPipe xs p = unrollPipe p >>= \case
+    Pure y             -> pure ([], Right y)
+    Free (PAwaitF _ f) -> case xs of
+      []   -> pure ([], Left f)
+      y:ys -> feedPipe ys (f y)
+    Free (PYieldF o q) -> first (o:) <$> feedPipe xs q
+
+

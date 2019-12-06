@@ -25,6 +25,8 @@ module Santabot.Bot (
   , helpBot
   , intervals
   , idBot
+  , Nick(..)
+  , lowerNick
   ) where
 
 import           Advent
@@ -33,6 +35,8 @@ import           Conduit
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Trans.Maybe
+import           Data.Char
+import           Data.Function
 import           Data.Functor
 import           Data.Text                 (Text)
 import           Data.Time                 as Time
@@ -221,3 +225,20 @@ risingEdgeAlert capLog delay noticeMe trigger response = A
         Left _      -> CSEmpty
         Right False -> CSNeg
         Right True  -> CSPos
+
+newtype Nick = Nick { unNick :: String }
+  deriving Show
+
+lowerNick :: Nick -> String
+lowerNick (Nick s) = map go s
+  where
+    go '{' = '['
+    go '}' = ']'
+    go '|' = '\\'
+    go c   = toLower c
+
+instance Eq Nick where
+    (==) = (==) `on` lowerNick
+
+instance Ord Nick where
+    compare = compare `on` lowerNick
