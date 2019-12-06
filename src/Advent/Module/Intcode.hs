@@ -54,12 +54,12 @@ data ICom = ICLaunch [Int] (Either (NESeq Int) String)      -- pastebin id
 
 parseCom :: Parser ICom
 parseCom = asum
-     [ try $ ICLaunch <$> (parseList <* lexeme "|") <*> parseMemory
-     , try $ ICLaunch [] <$> parseMemory
-     , try $ ICPush  <$> (lexeme "push" *> parseNick) <*> parseNE
-     -- , try $ ICPipe  <$> (lexeme "pipe" *> parseNick) <*> parseNick
+     [ try $ ICPush  <$> (lexeme "push" *> parseNick) <*> parseNE
      , try $ ICClear <$  lexeme "clear"
      , try $ ICHelp  <$  lexeme "help"
+     -- , try $ ICPipe  <$> (lexeme "pipe" *> parseNick) <*> parseNick
+     , try $ ICLaunch <$> (parseList <* lexeme "|") <*> parseMemory
+     , try $ ICLaunch [] <$> parseMemory
      ] <* eof
   where
     lexeme    = L.lexeme space
