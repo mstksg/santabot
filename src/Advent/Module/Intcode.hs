@@ -7,6 +7,7 @@
 {-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE RankNTypes                #-}
 {-# LANGUAGE TupleSections             #-}
+{-# LANGUAGE ViewPatterns              #-}
 
 module Advent.Module.Intcode (
     intcodeBot
@@ -116,7 +117,7 @@ intcodeBot v = C
                 if Nick user `M.member` curr
                   then pure $
                         [P.s|%s currently has a running thread. !intcode clear to delete.|] user
-                  else handleOut user curr $ runStateT (feedPipe inps stepForever) m
+                  else handleOut (Nick user) curr $ runStateT (feedPipe inps stepForever) m
         ICLaunch _ (Right link) -> pure . T.pack $
           [P.s|Loading pastebin %s ... jk, this isn't implemented yet|] link
         ICPush nk (i :| is) -> fmap T.pack . liftIO $ do
@@ -125,7 +126,7 @@ intcodeBot v = C
             Nothing              ->
               pure $ [P.s|No thread for %s found|] (unNick nk)
             Just (Paused next m) ->
-              handleOut user curr $ runStateT (feedPipe is (next i)) m
+              handleOut nk curr $ runStateT (feedPipe is (next i)) m
         ICClear -> liftIO . atomicModifyIORef v $ \mp ->
           let (Any found, mp') = M.alterF (const (Any True, Nothing)) (Nick user) mp
           in  (mp',) . T.pack $ if found
@@ -135,44 +136,66 @@ intcodeBot v = C
         ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; clear; help"
     }
   where
-    displayOutput out
+    displayOutput (splitAt 10->(out, rest))
         | null out         = "<no output>"
-        | all isPrint out' = "output: " ++ out'
-        | otherwise        = "output: " ++ intercalate "," (map show out)
+        -- | all isPrint out' = [P.s|output: %s (%s)|] out' outarr
+        | all inBounds out && all isPrint outStr && length out > 2 = [P.s|output: %s%s|] outStr truncString
+        | otherwise        = [P.s|output: %s%s|] outarr truncString
       where
-        out' = map chr out
-    handleOut user curr = \case
+        outStr = map chr out
+        inBounds c = c <= ord maxBound && c >= ord minBound
+        outarr = intercalate "," (map show out)
+        truncString
+          | null rest = ""
+          | otherwise = " (truncated)"
+
+    handleOut nk curr = \case
       Left e                  -> pure $ [P.s|error: %s|] e
       Right ((outs, res), m') -> case res of
         Left next -> do
-          writeIORef v $ M.insert (Nick user) (Paused next m') curr
+          writeIORef v $ M.insert nk (Paused next m') curr
           pure $
-            [P.s|%s... awaiting input (!intcode push %s <inp> to continue) (%d fuel remaining)|]
+            [P.s|%s... awaiting input (!intcode push %s <inp> to continue)|]
+            -- [P.s|%s... awaiting input (!intcode push %s <inp> to continue) (%d fuel remaining)|]
               (displayOutput outs)
-              user
-              (mFuel m')
+              (unNick nk)
+              -- (mFuel m')
         Right () -> pure $
             [P.s|%s; halt, @0 = %d; %d fuel unused|]
               (displayOutput outs)
               (NESeq.head (mRegs m'))
               (mFuel m')
 
-unrollPipe
-    :: Monad m
-    => Pipe i o u m a
-    -> m (FreeF (PipeF i o u) a (Pipe i o u m a))
-unrollPipe = (fmap . fmap) fromRecPipe . runFreeT . toRecPipe
-
 feedPipe
     :: Monad m
     => [i]
     -> Pipe i o u m a
     -> m ([o], Either (i -> Pipe i o u m a) a)
-feedPipe xs p = unrollPipe p >>= \case
-    Pure y             -> pure ([], Right y)
-    Free (PAwaitF _ f) -> case xs of
-      []   -> pure ([], Left f)
-      y:ys -> feedPipe ys (f y)
-    Free (PYieldF o q) -> first (o:) <$> feedPipe xs q
+feedPipe xs = (fmap . second . first . fmap) fromRecPipe . feedPipe_ xs . toRecPipe
+-- p = unrollPipe p >>= \case
+--     Pure y             -> pure ([], Right y)
+--     Free (PAwaitF _ f) -> case xs of
+--       []   -> pure ([], Left f)
+--       y:ys -> feedPipe n ys (f y)
+--     Free (PYieldF o q) -> first (take n . (o:)) <$> feedPipe n xs q
+
+feedPipe_
+    :: Monad m
+    => [i]
+    -> RecPipe i o u m a
+    -> m ([o], Either (i -> RecPipe i o u m a) a)
+feedPipe_ xs (FreeT p) = p >>= \case
+    Pure y -> pure ([], Right y)
+    Free (PAwaitF _ g) -> case xs of
+      []   -> pure ([], Left g)
+      y:ys -> feedPipe_ ys (g y)
+    Free (PYieldF o q) -> first (o:) <$> feedPipe_ xs q
+
+    -- unrollPipe p >>= \case
+    -- Pure y             -> pure ([], Right y)
+    -- Free (PAwaitF _ f) -> case xs of
+    --   []   -> pure ([], Left f)
+    --   y:ys -> feedPipe_ ys (f y)
+    -- Free (PYieldF o q) -> first (o:) <$> feedPipe_ xs q
 
 
