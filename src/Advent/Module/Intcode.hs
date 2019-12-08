@@ -105,7 +105,7 @@ maxOut :: Int
 maxOut = 100
 
 maxInput :: Int
-maxInput = 10000
+maxInput = 100000
 
 fetchRegs :: MonadResource m => Manager -> U.URI -> ExceptT String m (NESeq Int)
 fetchRegs mgr u = do
