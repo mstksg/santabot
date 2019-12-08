@@ -124,6 +124,7 @@ fetchRegs mgr u = do
     validHosts = [ "raw.githubusercontent.com"
                  , "gist.githubusercontent.com"
                  , "pastebin.com"
+                 , "dpaste.com"
                  ]
 
 intcodeBot :: MonadUnliftIO m => Manager -> IORef (Map Nick Paused) -> Command m

@@ -80,6 +80,7 @@ executables:
     - aeson
     - conduit
     - containers
+    - http-client-tls
     - http-conduit
     - mtl
     - santabot

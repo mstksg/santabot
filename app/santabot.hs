@@ -12,6 +12,7 @@ import           Data.IORef
 import           Data.Map                (Map)
 import           Data.Time.Format
 import           GHC.Generics
+import           Network.HTTP.Client.TLS
 import           Network.HTTP.Conduit
 import           Santabot
 import           Santabot.Bot
@@ -79,7 +80,7 @@ main = do
     c@Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
     T.putStrLn . T.decodeUtf8 . Y.encode $ c
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
-    mgr
+    mgr <- newTlsManager
     intcodeMap <- newIORef mempty
     launchIRC cChannels cNick cPassword (cTick * 1000000)
         (masterBot c mgr intcodeMap phrasebook)
