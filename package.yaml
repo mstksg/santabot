@@ -33,17 +33,23 @@ library:
   source-dirs: src
   dependencies:
   - bytestring
+  - conduino
   - conduit
   - containers
   - deepseq
   - directory
   - filepath
   - finite-typelits
+  - free
   - http-client
   - http-client-tls
+  - http-conduit
   - human-readable-duration
   - intervals
+  - linear
+  - machines
   - megaparsec
+  - modern-uri
   - mtl
   - nonempty-containers
   - parser-combinators
@@ -61,10 +67,6 @@ library:
   - transformers
   - uri-bytestring
   - yaml
-  - machines
-  - linear
-  - conduino
-  - free
 
 executables:
   santabot:
@@ -78,6 +80,7 @@ executables:
     - aeson
     - conduit
     - containers
+    - http-conduit
     - mtl
     - santabot
     - text

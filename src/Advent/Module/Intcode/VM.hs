@@ -82,7 +82,8 @@ withInput
     -> (t Int -> m r)
     -> m r
 withInput mo f = do
-    inp <- for (fillModes mo) $ \mode -> do
+    mos <- either (throwError . ("bad mode: " <>) . show) pure $ fillModes mo
+    inp <- for mos $ \mode -> do
       a <- readMem
       case mode of
         Pos -> peekMem a
@@ -91,10 +92,10 @@ withInput mo f = do
 
 -- | Magically fills a fixed-shape 'Applicative' with each mode from a mode
 -- op int.
-fillModes :: (Traversable t, Applicative t) => Int -> t Mode
-fillModes i = snd $ mapAccumL go i (pure ())
+fillModes :: (Traversable t, Applicative t) => Int -> Either Int (t Mode)
+fillModes i = sequence . snd $ mapAccumL go i (pure ())
   where
-    go j _ = (t, case o of 0 -> Pos; _ -> Imm)
+    go j _ = (t, case o of 0 -> Right Pos; 1 -> Right Imm; k -> Left k)
       where
         (t,o) = j `divMod` 10
 
@@ -125,7 +126,9 @@ step = do
     case ir of
       IRWrite y -> do
         c <- readMem
-        True <$ modify (\(Mem u p r) -> Mem u p (NESeq.update c y r))
+        Mem u p r <- get
+        unless (c < NESeq.length r) $ throwError $ "Update out of range: " ++ show c
+        True <$ put (Mem u p (NESeq.update c y r))
       IRJump  z ->
         True <$ modify (\(Mem u _ r) -> Mem u z r)
       IRNop     ->

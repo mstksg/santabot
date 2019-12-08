@@ -16,6 +16,7 @@ module Advent.Module.Intcode (
   ) where
 
 import           Advent.Module.Intcode.VM
+import           Conduit
 import           Control.Applicative hiding         (many, some)
 import           Control.Monad.Except
 import           Control.Monad.State
@@ -33,21 +34,24 @@ import           Data.Semigroup
 import           Data.Sequence.NonEmpty             (NESeq)
 import           Data.Set                           (Set)
 import           Data.Text                          (Text)
-import           Data.Void
+import           Network.HTTP.Conduit
 import           Santabot.Bot
 import           Text.Megaparsec
 import           Text.Megaparsec.Char
 import qualified Control.Monad.Combinators.NonEmpty as NE
+import qualified Data.Conduit                       as C
+import qualified Data.Conduit.Combinators           as C
 import qualified Data.Map                           as M
 import qualified Data.Sequence.NonEmpty             as NESeq
 import qualified Data.Set                           as S
 import qualified Data.Text                          as T
 import qualified Language.Haskell.Printf            as P
 import qualified Text.Megaparsec.Char.Lexer         as L
+import qualified Text.URI                           as U
 
 type Parser = Parsec Void Text
 
-data ICom = ICLaunch [Int] (Either (NESeq Int) String)      -- pastebin id
+data ICom = ICLaunch [Int] (Either (NESeq Int) U.URI)
           | ICPush   Nick (NonEmpty Int)
           -- | ICPipe   Nick Nick
           | ICClear
@@ -60,26 +64,28 @@ parseCom = asum
      , try $ ICClear <$  lexeme "clear"
      , try $ ICHelp  <$  lexeme "help"
      -- , try $ ICPipe  <$> (lexeme "pipe" *> parseNick) <*> parseNick
-     , try $ ICLaunch <$> (parseList <* lexeme "|") <*> parseMemory
-     , try $ ICLaunch [] <$> parseMemory
+     , try $ ICLaunch <$> (parseList <* lexeme "|") <*> parseMem
+     , try $ ICLaunch [] <$> parseMem
      ] <* eof
   where
-    lexeme    = L.lexeme space
-    number    :: Parser Int
-    number    = lexeme $ L.signed (pure ()) L.decimal
     parseList :: Parser [Int]
     parseList = number `sepBy` optional (lexeme ",")
-    parseNE :: Parser (NonEmpty Int)
-    parseNE = number `NE.sepBy1` optional (lexeme ",")
-    parseMemory :: Parser (Either (NESeq Int) String)
-    parseMemory = (Left  <$> (NESeq.fromList <$> parseNE))
-              <|> (Right <$> gistLink)
-    gistLink :: Parser String
-    gistLink = lexeme (some (satisfy (`S.member` validPastebin)))
+    parseMem :: Parser (Either (NESeq Int) U.URI)
+    parseMem = (Left  <$> parseMemory    )
+           <|> (Right <$> lexeme U.parser)
     parseNick :: Parser Nick
     parseNick = fmap Nick . lexeme $
       (:) <$> satisfy (`S.member` validNick1)
           <*> many (satisfy (`S.member` validNick))
+
+lexeme      :: Parser a -> Parser a
+lexeme      = L.lexeme space
+number      :: Parser Int
+number      = lexeme $ L.signed (pure ()) L.decimal
+parseNE     :: Parser (NonEmpty Int)
+parseNE     = number `NE.sepBy1` optional (lexeme ",")
+parseMemory :: Parser (NESeq Int)
+parseMemory = NESeq.fromList <$> parseNE
 
 validNick1 :: Set Char
 validNick1 = S.fromList $
@@ -90,19 +96,38 @@ validNick1 = S.fromList $
 validNick :: Set Char
 validNick = validNick1 <> S.fromList ('-':['0'..'9'])
 
-validPastebin :: Set Char
-validPastebin = S.fromList $
-     ['A'..'Z']
-  ++ ['a'..'z']
-  ++ ['0'..'9']
-
 data Paused = Paused (Int -> VM) Memory
 
 maxFuel :: Int
 maxFuel = 100000
 
-intcodeBot :: MonadIO m => IORef (Map Nick Paused) -> Command m
-intcodeBot v = C
+maxOut :: Int
+maxOut = 100
+
+maxInput :: Int
+maxInput = 10000
+
+fetchRegs :: MonadResource m => Manager -> U.URI -> ExceptT String m (NESeq Int)
+fetchRegs mgr u = do
+    req <- maybe (throwError "bad uri") pure $ parseRequest (U.renderStr u)
+    unless (host req `elem` validHosts) $
+      throwError "unapproved link source (only raw github, raw gist, and raw pastebin)"
+    resp <- http req mgr
+    dat  <- runConduit $ responseBody resp
+                    C..| C.decodeUtf8Lenient
+                    C..| C.takeE maxInput
+                    C..| C.fold
+    either (const (throwError noParseE)) pure $
+      runParser parseMemory (U.renderStr u) dat
+  where
+    noParseE = "could not parse data; may have been truncated. remember to use 'raw' link if available"
+    validHosts = [ "raw.githubusercontent.com"
+                 , "gist.githubusercontent.com"
+                 , "pastebin.com"
+                 ]
+
+intcodeBot :: MonadUnliftIO m => Manager -> IORef (Map Nick Paused) -> Command m
+intcodeBot mgr v = C
     { cName  = "intcode"
     , cHelp  = T.pack $ [P.s|Launch or interact with an intcode (2019 Days 2 & 5) process; max runtime %d instr. !intcode help for commands|]
                   maxFuel
@@ -110,16 +135,14 @@ intcodeBot v = C
           Left  _ -> Left "could not parse command"
           Right r -> Right (mUser msg, r)
     , cResp  = uncurry $ \user -> \case
-        ICLaunch inps (Left regs) ->
-          let m = Mem maxFuel 0 regs
-          in  fmap T.pack . liftIO $ do
-                curr <- readIORef v
-                if Nick user `M.member` curr
-                  then pure $
-                        [P.s|%s currently has a running thread. !intcode clear to delete.|] user
-                  else handleOut (Nick user) curr $ runStateT (feedPipe inps stepForever) m
-        ICLaunch _ (Right link) -> pure . T.pack $
-          [P.s|Loading pastebin %s ... jk, this isn't implemented yet|] link
+        ICLaunch inps regsSpec -> fmap (either T.pack T.pack) . runResourceT . runExceptT $ do
+          m    <- Mem maxFuel 0 <$> either pure (fetchRegs mgr) regsSpec
+          curr <- liftIO $ readIORef v
+          if Nick user `M.member` curr
+            then pure $ [P.s|%s currently has a running thread. !intcode clear to delete.|] user
+            else liftIO $ handleOut (Nick user) curr $ runStateT (feedPipe inps stepForever) m
+        -- ICLaunch _ (Right link) -> pure . T.pack $
+        --   [P.s|Loading %s ... jk, this isn't implemented yet|] (T.pack $ U.render link)
         ICPush nk (i :| is) -> fmap T.pack . liftIO $ do
           curr <- atomicModifyIORef v $ \mp -> (M.delete nk mp, mp)
           case nk `M.lookup` curr of
@@ -136,7 +159,7 @@ intcodeBot v = C
         ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; clear; help"
     }
   where
-    displayOutput (splitAt 10->(out, rest))
+    displayOutput (splitAt maxOut->(out, rest))
         | null out         = "<no output>"
         -- | all isPrint out' = [P.s|output: %s (%s)|] out' outarr
         | all inBounds out && all isPrint outStr && length out > 2 = [P.s|output: %s%s|] outStr truncString
@@ -172,12 +195,6 @@ feedPipe
     -> Pipe i o u m a
     -> m ([o], Either (i -> Pipe i o u m a) a)
 feedPipe xs = (fmap . second . first . fmap) fromRecPipe . feedPipe_ xs . toRecPipe
--- p = unrollPipe p >>= \case
---     Pure y             -> pure ([], Right y)
---     Free (PAwaitF _ f) -> case xs of
---       []   -> pure ([], Left f)
---       y:ys -> feedPipe n ys (f y)
---     Free (PYieldF o q) -> first (take n . (o:)) <$> feedPipe n xs q
 
 feedPipe_
     :: Monad m
@@ -190,12 +207,3 @@ feedPipe_ xs (FreeT p) = p >>= \case
       []   -> pure ([], Left g)
       y:ys -> feedPipe_ ys (g y)
     Free (PYieldF o q) -> first (o:) <$> feedPipe_ xs q
-
-    -- unrollPipe p >>= \case
-    -- Pure y             -> pure ([], Right y)
-    -- Free (PAwaitF _ f) -> case xs of
-    --   []   -> pure ([], Left f)
-    --   y:ys -> feedPipe_ ys (f y)
-    -- Free (PYieldF o q) -> first (o:) <$> feedPipe_ xs q
-
-

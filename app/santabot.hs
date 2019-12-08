@@ -12,6 +12,7 @@ import           Data.IORef
 import           Data.Map                (Map)
 import           Data.Time.Format
 import           GHC.Generics
+import           Network.HTTP.Conduit
 import           Santabot
 import           Santabot.Bot
 import           Santabot.Run
@@ -45,13 +46,13 @@ instance A.ToJSON Conf where
       { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
       }
 
-masterBot :: Conf -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()
-masterBot Conf{..} intcodeMap phrasebook = runReaderC phrasebook . mergeBots $
+masterBot :: Conf -> Manager -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()
+masterBot Conf{..} mgr intcodeMap phrasebook = runReaderC phrasebook . mergeBots $
     [ commandBots $
         [ puzzleLink
         , puzzleThread
         , nextPuzzle
-        , intcodeBot intcodeMap
+        , intcodeBot mgr intcodeMap
         , simpleCommand "about" "Information about santabot" . addSantaPhrase $
             "I'm a helper bot for ##adventofcode and AoC util! Developed by jle`, source at https://github.com/mstksg/santabot. All commands also work in private message."
         , simpleCommand "time" "The current time on AoC servers" $ do
@@ -78,6 +79,7 @@ main = do
     c@Conf{..} <- Y.decodeFileThrow "santabot-conf.yaml"
     T.putStrLn . T.decodeUtf8 . Y.encode $ c
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
+    mgr
     intcodeMap <- newIORef mempty
     launchIRC cChannels cNick cPassword (cTick * 1000000)
-        (masterBot c intcodeMap phrasebook)
+        (masterBot c mgr intcodeMap phrasebook)
