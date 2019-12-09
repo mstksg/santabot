@@ -41,7 +41,6 @@ import           Text.Megaparsec.Char
 import qualified Control.Monad.Combinators.NonEmpty as NE
 import qualified Data.Conduit                       as C
 import qualified Data.Conduit.Combinators           as C
-import qualified Data.IntMap                        as IM
 import qualified Data.Map                           as M
 import qualified Data.Sequence.NonEmpty             as NESeq
 import qualified Data.Set                           as S
@@ -138,7 +137,7 @@ intcodeBot mgr v = C
           Right r -> Right (mUser msg, r)
     , cResp  = uncurry $ \user -> \case
         ICLaunch inps regsSpec -> fmap (either T.pack T.pack) . runResourceT . runExceptT $ do
-          m    <- Mem maxFuel 0 0 . IM.fromList . zip [0..] . toList <$> either pure (fetchRegs mgr) regsSpec
+          m    <- Mem maxFuel 0 0 . M.fromList . zip [0..] . toList <$> either pure (fetchRegs mgr) regsSpec
           curr <- liftIO $ readIORef v
           if Nick user `M.member` curr
             then pure $ [P.s|%s currently has a running thread. !intcode clear to delete.|] user
@@ -188,7 +187,7 @@ intcodeBot mgr v = C
         Right () -> pure $
             [P.s|%s; halt, @0 = %d; %d fuel unused|]
               (displayOutput outs)
-              (IM.findWithDefault 0 0 (mRegs m'))
+              (M.findWithDefault 0 0 (mRegs m'))
               (mFuel m')
 
 feedPipe
