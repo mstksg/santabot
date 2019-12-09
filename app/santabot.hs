@@ -52,6 +52,7 @@ masterBot Conf{..} mgr intcodeMap phrasebook = runReaderC phrasebook . mergeBots
     [ commandBots $
         [ puzzleLink
         , puzzleThread
+        , capTimeBot
         , nextPuzzle
         , intcodeBot mgr intcodeMap
         , simpleCommand "about" "Information about santabot" . addSantaPhrase $

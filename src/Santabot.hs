@@ -14,6 +14,7 @@
 module Santabot (
     puzzleLink
   , puzzleThread
+  , capTimeBot
   , nextPuzzle
   , challengeCountdown
   , eventCountdown
@@ -24,6 +25,7 @@ module Santabot (
   , addSantaPhrase
   , validYears
   , dayTitle
+  , prettyTime
   ) where
 
 import           Advent
@@ -39,6 +41,7 @@ import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
+import           Data.List.NonEmpty         (NonEmpty(..))
 import           Data.Map                   (Map)
 import           Data.Maybe
 import           Data.Set                   (Set)
@@ -86,6 +89,24 @@ fancyLink y d url = do
     title <- foldMap ([P.s|: "%s"|] . T.unpack) <$> dayTitle y d
     pure . T.pack $
       [P.s|[%d Day %d%s] %s|] y (dayInt d) title url
+
+capTimeBot :: MonadIO m => Command m
+capTimeBot = C
+    { cName  = "cap"
+    , cHelp  = "Get information on the leaderboard cap time for a day (!cap 23, !cap 2017 16).  If bad day or year given, just returns most recent match."
+    , cParse = askLink
+    , cResp  = \(y,d) -> liftIO $ do
+        ct <- getCapTime y d
+        fancyLink y d $ case ct of
+          Nothing           -> "Leaderboard still open for both parts"
+          Just (t, Nothing) -> [P.s|(Part 1) %s|] (prettyTime t)
+          Just (t, Just u ) -> [P.s|(Part 1) %s / (Part 2) %s|]
+                                 (prettyTime t) (prettyTime u)
+    }
+
+prettyTime :: UTCTime -> String
+prettyTime = formatTime defaultTimeLocale "%H:%M:%S EST"
+           . utcToLocalTime (read "EST")
 
 askLink
     :: MonadIO m
@@ -211,31 +232,35 @@ eventCountdown = A
         suff | n == 1    = "" :: String
              | otherwise = "s"
 
-getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe UTCTime)
+getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))
 getCapTime y d = liftIO $ do
     t <- aocServerTime
     putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
                   y (dayInt d) (show t)
     mlb <- either (const Nothing) Just <$>
       runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
-    pure $ mlb >>= \lb -> do
-      guard $ fullDailyBoard lb
-      entries <- NE.nonEmpty . toList . dlbStar2 $ lb
-      let times = zonedTimeToUTC . dlbmCompleteTime y d . dlbmDecTime <$> entries
-      pure $ maximum times
+    pure $ mlb >>= \DLB{..} -> do
+      guard $ M.size dlbStar1 >= 100
+      ctime1 <- completeTime <$> NE.nonEmpty (toList dlbStar1)
+      let ctime2 = do
+            guard $ M.size dlbStar2 >= 100
+            completeTime <$> NE.nonEmpty (toList dlbStar2)
+      pure (ctime1, ctime2)
+    where
+      completeTime :: NonEmpty DailyLeaderboardMember -> UTCTime
+      completeTime = maximum
+                   . fmap (zonedTimeToUTC . dlbmCompleteTime y d . dlbmDecTime)
 
 boardCapped :: MonadIO m => Alert m
-boardCapped = risingEdgeAlert "capped" 1 True getCapTime response
+boardCapped = risingEdgeAlert "capped" 1 True
+                (\y d -> (snd =<<) <$> getCapTime y d)
+                response
   where
     response y d capTime = liftIO $ do
-      linkUrl <- getPostLink y d
-      let timeString = formatTime defaultTimeLocale "%H:%M:%S EST"
-                     . utcToLocalTime (read "EST")
-                     $ capTime
-          linkUrl'   = fromMaybe "thread not yet available" linkUrl
+      linkUrl <- fromMaybe "thread not yet available" <$> getPostLink y d
       pure . T.pack $
         [P.s|Leaderboard for Day %d is now capped at %s (%s)!|]
-          (dayInt d) timeString linkUrl'
+          (dayInt d) (prettyTime capTime) linkUrl
 
 privateCapped
     :: MonadIO m
@@ -259,7 +284,7 @@ privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigg
         guard $ M.size dayMap >= 10
         pure dayMap
     response y d capMap = do
-        globalCap <- getCapTime y d
+        globalCap <- (snd =<<) <$> getCapTime y d
         liftIO $ print globalCap
         pure . T.pack $
           [P.s|Congrats to IRC Board (%d%s) Top 10 of %04d day %d! %s|]
