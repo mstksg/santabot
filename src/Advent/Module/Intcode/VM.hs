@@ -130,7 +130,7 @@ fillModes i = do
 
 -- | Useful type to abstract over the actions of the different operations
 data InstrRes = IRWrite Int         -- ^ write a value to location at
-              | IRJump  Int         -- ^ jump to position
+              | IRJump  Natural     -- ^ jump to position
               | IRBase  Int         -- ^ set base
               | IRNop               -- ^ do nothing
               | IRHalt              -- ^ halt
@@ -148,8 +148,10 @@ step = do
       Mul -> withInput     mo $ \case V2 a b -> pure . IRWrite $ a * b
       Get -> withInput     mo $ \case V0     -> IRWrite <$> awaitSurely
       Put -> withInput     mo $ \case V1 a   -> IRNop <$ yield a
-      Jnz -> withInputLazy mo $ \case V2 a b -> a >>= \case 0 -> pure IRNop  ; _ -> IRJump <$> b
-      Jez -> withInputLazy mo $ \case V2 a b -> a >>= \case 0 -> IRJump <$> b; _ -> pure IRNop
+      Jnz -> withInputLazy mo $ \case V2 a b -> a >>= \case 0 -> pure IRNop
+                                                            _ -> IRJump <$> (toNatural' =<< b)
+      Jez -> withInputLazy mo $ \case V2 a b -> a >>= \case 0 -> IRJump <$> (toNatural' =<< b)
+                                                            _ -> pure IRNop
       Clt -> withInput     mo $ \case V2 a b -> pure . IRWrite $ if a <  b then 1 else 0
       Ceq -> withInput     mo $ \case V2 a b -> pure . IRWrite $ if a == b then 1 else 0
       ChB -> withInput     mo $ \case V1 a   -> pure $ IRBase a
@@ -162,8 +164,7 @@ step = do
           Rel -> (+) <$> (peekMem =<< gets mPos) <*> gets mBase
         _ <- readMem
         True <$ modify (\m -> m { mRegs = M.insert c y (mRegs m) })
-      IRJump  y -> do
-        z <- toNatural' y
+      IRJump  z ->
         True <$ modify (\m -> m { mPos = z })
       IRBase  b ->
         True <$ modify (\m -> m { mBase = b + mBase m })
