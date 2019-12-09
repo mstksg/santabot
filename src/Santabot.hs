@@ -93,7 +93,7 @@ fancyLink y d url = do
 capTimeBot :: MonadIO m => Command m
 capTimeBot = C
     { cName  = "cap"
-    , cHelp  = "Get information on the leaderboard cap time for a day (!cap 23, !cap 2017 16).  If bad day or year given, just returns most recent match."
+    , cHelp  = "Get information on the global Top 100 cap time for a day (!cap 23, !cap 2017 16).  If bad day or year given, just returns most recent match."
     , cParse = askLink
     , cResp  = \(y,d) -> liftIO $ do
         ct <- getCapTime y d

@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings         #-}
 {-# LANGUAGE QuasiQuotes               #-}
 {-# LANGUAGE RankNTypes                #-}
+{-# LANGUAGE RecordWildCards           #-}
 {-# LANGUAGE TupleSections             #-}
 
 
@@ -19,28 +20,29 @@ module Advent.Module.Intcode.VM (
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Conduino
+import           Data.IntMap               (IntMap)
 import           Data.Map                  (Map)
-import           Data.Sequence.NonEmpty    (NESeq(..))
 import           Data.Traversable
 import           Data.Void
 import           Linear
 import qualified Data.Conduino.Combinators as C
+import qualified Data.IntMap               as IM
 import qualified Data.Map                  as M
-import qualified Data.Sequence.NonEmpty    as NESeq
 
 type VM = Pipe Int Int Void (StateT Memory (Either String)) ()
 
 data Memory = Mem
     { mFuel :: Int
     , mPos  :: Int
-    , mRegs :: NESeq Int
+    , mBase :: Int
+    , mRegs :: IntMap Int
     }
   deriving Show
 
-data Mode = Pos | Imm
+data Mode = Pos | Imm | Rel
   deriving (Eq, Ord, Enum, Show)
 
-data Instr = Add | Mul | Get | Put | Jnz | Jez | Clt | Ceq | Hlt
+data Instr = Add | Mul | Get | Put | Jnz | Jez | Clt | Ceq | ChB | Hlt
   deriving (Eq, Ord, Enum, Show)
 
 instrMap :: Map Int Instr
@@ -51,57 +53,64 @@ instr :: Int -> Maybe Instr
 instr = (`M.lookup` instrMap)
 
 readMem
-    :: (MonadState Memory m, MonadError String m)
+    :: MonadState Memory m
     => m Int
 readMem = do
-    Mem u p r <- get
-    case NESeq.lookup p r of
-      Nothing -> throwError $ "bad index under current position: " ++ show p
-      Just x  -> x <$ put (Mem u (p + 1) r)
+    m@Mem{..} <- get
+    IM.findWithDefault 0 mPos mRegs <$ put (m { mPos = mPos + 1 })
 
 peekMem
-    :: (MonadState Memory m, MonadError String m)
+    :: MonadState Memory m
     => Int -> m Int
-peekMem i = do
-    Mem _ _ r <- get
-    case NESeq.lookup i r of
-      Nothing -> throwError $ "bad index for peek: " ++ show i
-      Just x  -> pure x
+peekMem i = gets $ IM.findWithDefault 0 i . mRegs
 
 useFuel :: (MonadState Memory m, MonadError String m) => m ()
 useFuel = do
-    Mem u p r <- get
+    u <- gets mFuel
     unless (u > 0) $ throwError "ran out of fuel"
-    put $ Mem (u - 1) p r
+    modify $ \m -> m { mFuel = u - 1 }
 
--- | Run a @t Int -> m r@ function by getting fetching an input container
+-- | Run a @t Int -> m r@ function by fetching an input container
 -- @t Int@.
 withInput
     :: (Traversable t, Applicative t, MonadState Memory m, MonadError String m)
     => Int      -- ^ mode int
     -> (t Int -> m r)
-    -> m r
+    -> m (r, Mode)
 withInput mo f = do
-    mos <- either (throwError . ("bad mode: " <>) . show) pure $ fillModes mo
-    inp <- for mos $ \mode -> do
+    (lastMode, modes) <- case fillModes mo of
+      Left  i -> throwError $ "bad mode: " ++ show i
+      Right x -> pure x
+    ba  <- gets mBase
+    inp <- for modes $ \mode -> do
       a <- readMem
       case mode of
         Pos -> peekMem a
-        Imm  -> pure a
-    f inp
+        Imm -> pure a
+        Rel -> peekMem (a + ba)
+    (, lastMode) <$> f inp
+
+intMode :: Int -> Maybe Mode
+intMode = \case 0 -> Just Pos
+                1 -> Just Imm
+                2 -> Just Rel
+                _ -> Nothing
 
 -- | Magically fills a fixed-shape 'Applicative' with each mode from a mode
 -- op int.
-fillModes :: (Traversable t, Applicative t) => Int -> Either Int (t Mode)
-fillModes i = sequence . snd $ mapAccumL go i (pure ())
+fillModes :: forall t. (Traversable t, Applicative t) => Int -> Either Int (Mode, t Mode)
+fillModes i = do
+    (lastMode, ms) <- traverse sequence $ mapAccumL go i (pure ())
+    (,ms) <$> maybeToEither lastMode (intMode lastMode)
   where
-    go j _ = (t, case o of 0 -> Right Pos; 1 -> Right Imm; k -> Left k)
+    go j _ = (t, maybeToEither o $ intMode o)
       where
         (t,o) = j `divMod` 10
 
 -- | Useful type to abstract over the actions of the different operations
-data InstrRes = IRWrite Int         -- ^ write a value
+data InstrRes = IRWrite Int       -- ^ write a value to location at
               | IRJump  Int         -- ^ jump to position
+              | IRBase  Int         -- ^ set base
               | IRNop               -- ^ do nothing
               | IRHalt              -- ^ halt
   deriving Show
@@ -113,24 +122,29 @@ step = do
     useFuel
     (mo, x) <- (`divMod` 100) <$> readMem
     o  <- maybeToEither ("bad instr: " ++ show x) $ instr x
-    ir <- case o of
+    (ir, lastMode) <- case o of
       Add -> withInput mo $ \case V2 a b  -> pure . IRWrite $ a + b
       Mul -> withInput mo $ \case V2 a b  -> pure . IRWrite $ a * b
-      Get -> IRWrite <$> awaitSurely
+      Get -> withInput mo $ \case V0      -> IRWrite <$> awaitSurely
       Put -> withInput mo $ \case V1 a    -> IRNop <$ yield a
       Jnz -> withInput mo $ \case V2 a b  -> pure $ if a /= 0 then IRJump b else IRNop
       Jez -> withInput mo $ \case V2 a b  -> pure $ if a == 0 then IRJump b else IRNop
       Clt -> withInput mo $ \case V2 a b  -> pure . IRWrite $ if a <  b then 1 else 0
       Ceq -> withInput mo $ \case V2 a b  -> pure . IRWrite $ if a == b then 1 else 0
-      Hlt                                 -> pure IRHalt
+      ChB -> withInput mo $ \case V1 a    -> pure $ IRBase a
+      Hlt -> withInput mo $ \case V0      -> pure IRHalt
     case ir of
       IRWrite y -> do
-        c <- readMem
-        Mem u p r <- get
-        unless (c < NESeq.length r) $ throwError $ "Update out of range: " ++ show c
-        True <$ put (Mem u p (NESeq.update c y r))
+        c <- case lastMode of
+               Pos -> peekMem =<< gets mPos
+               Imm -> gets mPos
+               Rel -> (+) <$> (peekMem =<< gets mPos) <*> gets mBase
+        _ <- readMem
+        True <$ modify (\m -> m { mRegs = IM.insert c y (mRegs m) })
       IRJump  z ->
-        True <$ modify (\(Mem u _ r) -> Mem u z r)
+        True <$ modify (\m -> m { mPos = z })
+      IRBase  b ->
+        True <$ modify (\m -> m { mBase = b + mBase m })
       IRNop     ->
         pure True
       IRHalt    ->
@@ -141,12 +155,151 @@ stepForever
     => Pipe Int Int Void m ()
 stepForever = untilFalse step
 
+-- stepForeverAndDie
+--     :: MonadError String m
+--     => Memory
+--     -> Pipe Int Int Void m Void
+-- stepForeverAndDie m = stepForever m *> throwError "no more input to give"
+
+-- untilHalt
+--     :: Monad m
+--     => Pipe i o u (ExceptT String m) a
+--     -> Pipe i o u m                  ()
+-- untilHalt = void . runExceptP
+
+-- parseMem :: String -> Maybe Memory
+-- parseMem = fmap (Mem 0 0 . IM.fromList . zip [0..])
+--          . traverse readMaybe
+--          . splitOn ","
+
 untilFalse :: Monad m => m Bool -> m ()
 untilFalse x = go
   where
     go = x >>= \case
       False -> pure ()
       True  -> go
+
+-- yieldAndDie :: MonadError String m => o -> Pipe i o u m a
+-- yieldAndDie i = yield i *> throwError "that's all you get"
+
+-- yieldAndPass :: o -> Pipe o o u m u
+-- yieldAndPass i = yield i *> C.map id
+
+
+
+-- type VM = Pipe Int Int Void (StateT Memory (Either String)) ()
+
+-- data Memory = Mem
+--     { mFuel :: Int
+--     , mPos  :: Int
+--     , mRegs :: NESeq Int
+--     }
+--   deriving Show
+
+-- data Mode = Pos | Imm
+--   deriving (Eq, Ord, Enum, Show)
+
+-- data Instr = Add | Mul | Get | Put | Jnz | Jez | Clt | Ceq | Hlt
+--   deriving (Eq, Ord, Enum, Show)
+
+-- instrMap :: Map Int Instr
+-- instrMap = M.fromList $
+--     (99, Hlt) : zip [1 ..] [Add ..]
+
+-- instr :: Int -> Maybe Instr
+-- instr = (`M.lookup` instrMap)
+
+-- readMem
+--     :: (MonadState Memory m, MonadError String m)
+--     => m Int
+-- readMem = do
+--     Mem u p r <- get
+--     case NESeq.lookup p r of
+--       Nothing -> throwError $ "bad index under current position: " ++ show p
+--       Just x  -> x <$ put (Mem u (p + 1) r)
+
+-- peekMem
+--     :: (MonadState Memory m, MonadError String m)
+--     => Int -> m Int
+-- peekMem i = do
+--     Mem _ _ r <- get
+--     case NESeq.lookup i r of
+--       Nothing -> throwError $ "bad index for peek: " ++ show i
+--       Just x  -> pure x
+
+-- -- | Run a @t Int -> m r@ function by getting fetching an input container
+-- -- @t Int@.
+-- withInput
+--     :: (Traversable t, Applicative t, MonadState Memory m, MonadError String m)
+--     => Int      -- ^ mode int
+--     -> (t Int -> m r)
+--     -> m r
+-- withInput mo f = do
+--     mos <- either (throwError . ("bad mode: " <>) . show) pure $ fillModes mo
+--     inp <- for mos $ \mode -> do
+--       a <- readMem
+--       case mode of
+--         Pos -> peekMem a
+--         Imm  -> pure a
+--     f inp
+
+-- -- | Magically fills a fixed-shape 'Applicative' with each mode from a mode
+-- -- op int.
+-- fillModes :: (Traversable t, Applicative t) => Int -> Either Int (t Mode)
+-- fillModes i = sequence . snd $ mapAccumL go i (pure ())
+--   where
+--     go j _ = (t, case o of 0 -> Right Pos; 1 -> Right Imm; k -> Left k)
+--       where
+--         (t,o) = j `divMod` 10
+
+-- -- | Useful type to abstract over the actions of the different operations
+-- data InstrRes = IRWrite Int         -- ^ write a value
+--               | IRJump  Int         -- ^ jump to position
+--               | IRNop               -- ^ do nothing
+--               | IRHalt              -- ^ halt
+--   deriving Show
+
+-- step
+--     :: (MonadError String m, MonadState Memory m)
+--     => Pipe Int Int Void m Bool
+-- step = do
+--     useFuel
+--     (mo, x) <- (`divMod` 100) <$> readMem
+--     o  <- maybeToEither ("bad instr: " ++ show x) $ instr x
+--     ir <- case o of
+--       Add -> withInput mo $ \case V2 a b  -> pure . IRWrite $ a + b
+--       Mul -> withInput mo $ \case V2 a b  -> pure . IRWrite $ a * b
+--       Get -> IRWrite <$> awaitSurely
+--       Put -> withInput mo $ \case V1 a    -> IRNop <$ yield a
+--       Jnz -> withInput mo $ \case V2 a b  -> pure $ if a /= 0 then IRJump b else IRNop
+--       Jez -> withInput mo $ \case V2 a b  -> pure $ if a == 0 then IRJump b else IRNop
+--       Clt -> withInput mo $ \case V2 a b  -> pure . IRWrite $ if a <  b then 1 else 0
+--       Ceq -> withInput mo $ \case V2 a b  -> pure . IRWrite $ if a == b then 1 else 0
+--       Hlt                                 -> pure IRHalt
+--     case ir of
+--       IRWrite y -> do
+--         c <- readMem
+--         Mem u p r <- get
+--         unless (c < NESeq.length r) $ throwError $ "Update out of range: " ++ show c
+--         True <$ put (Mem u p (NESeq.update c y r))
+--       IRJump  z ->
+--         True <$ modify (\(Mem u _ r) -> Mem u z r)
+--       IRNop     ->
+--         pure True
+--       IRHalt    ->
+--         pure False
+
+-- stepForever
+--     :: (MonadState Memory m, MonadError String m)
+--     => Pipe Int Int Void m ()
+-- stepForever = untilFalse step
+
+-- untilFalse :: Monad m => m Bool -> m ()
+-- untilFalse x = go
+--   where
+--     go = x >>= \case
+--       False -> pure ()
+--       True  -> go
 
 
 runProg :: [Int] -> Memory -> Either String [Int]
