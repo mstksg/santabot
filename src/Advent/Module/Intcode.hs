@@ -50,6 +50,8 @@ import qualified Language.Haskell.Printf            as P
 import qualified Text.Megaparsec.Char.Lexer         as L
 import qualified Text.URI                           as U
 
+type VM_ = Pipe Int Int Void (Either String) (Maybe Natural, Memory)
+
 type Parser = Parsec Void Text
 
 data ICom = ICLaunch [Int] (Either (NESeq Int) U.URI)
@@ -99,14 +101,16 @@ validNick1 = S.fromList $
 validNick :: Set Char
 validNick = validNick1 <> S.fromList ('-':['0'..'9'])
 
-data Paused = Paused (Maybe (Int -> VM)) Memory
+data Paused = NeedInput (Int -> VM_)
+            | NeedFuel  Memory
+            -- Paused (Maybe (Int -> VM)) Memory
 
 
 maxFuel :: Natural
 maxFuel = 100000
 
 maxOut :: Int
-maxOut = 100
+maxOut = 75
 
 maxInput :: Int
 maxInput = 100000
@@ -145,26 +149,26 @@ intcodeBot mgr v = C
           curr <- liftIO $ readIORef v
           if Nick user `M.member` curr
             then pure $ [P.s|%s currently has a running thread. !intcode clear to delete.|] user
-            else liftIO $ handleOut (Nick user) curr $ runStateT (feedPipe inps (stepN maxFuel)) m
+            else liftIO $ handleOut (Nick user) curr $ feedPipe inps (runStateP m (stepN maxFuel))
         ICPush nk (i :| is) -> fmap T.pack . liftIO $ do
           curr <- readIORef v
           case nk `M.lookup` curr of
             Nothing              ->
               pure $ [P.s|No thread for %s found|] (unNick nk)
-            Just (Paused Nothing _) ->
-              pure $ [P.s|Thread for %s out of fuel; use '!intcode %s refuel' to continue|]
+            Just (NeedFuel _) ->
+              pure $ [P.s|Thread for %s out of fuel; use '!intcode refuel %s' to continue|]
                 (unNick nk)
                 (unNick nk)
-            Just (Paused (Just next) m) ->
-              handleOut nk curr $ runStateT (feedPipe is (next i)) m
+            Just (NeedInput next) ->
+              handleOut nk curr $ feedPipe is (next i)
         ICRefuel nk -> fmap T.pack . liftIO $ do
           curr <- readIORef v
           case nk `M.lookup` curr of
             Nothing              ->
               pure $ [P.s|No thread for %s found|] (unNick nk)
-            Just (Paused Nothing m) ->
-              handleOut (Nick user) curr $ runStateT (feedPipe [] (stepN maxFuel)) m
-            Just (Paused (Just _) _) ->
+            Just (NeedFuel m) ->
+              handleOut (Nick user) curr $ feedPipe [] (runStateP m (stepN maxFuel))
+            Just (NeedInput _) ->
               pure $ [P.s|Thread for %s still has fuel; use '!intcode %s push <input>' to continue|]
                 (unNick nk)
                 (unNick nk)
@@ -174,48 +178,54 @@ intcodeBot mgr v = C
                 then [P.s|Thread %s deleted|] user
                 else [P.s|No thread for %s found|] user
         -- ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; pipe <id> <id>; clear; help"
-        ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; clear; help"
+        ICHelp  -> pure "Valid commands: <prog>; <inps> | <prog>; push <id> <inps>; refuel <id>; clear; help"
     }
   where
     displayOutput (splitAt maxOut->(out, rest))
         | null out         = "<no output>"
         -- | all isPrint out' = [P.s|output: %s (%s)|] out' outarr
-        | all inBounds out && all isPrint outStr && length out > 2 = [P.s|output: %s%s|] outStr truncString
+        | printAsString = [P.s|output: %s%s|] outStr truncString
         | otherwise        = [P.s|output: %s%s|] outarr truncString
       where
+        printAsString = and
+          [ all inBounds out
+          , all isPrint outStr
+          , length out > 2
+          , all isAscii outStr
+          ]
         outStr = map chr out
         inBounds c = c <= ord maxBound && c >= ord minBound
-        outarr = intercalate "," (map show out)
+        (outarr, rest') = splitAt (maxOut * 2) $ intercalate "," (map show out)
         truncString
-          | null rest = ""
+          | null rest && null rest' = ""
           | otherwise = " (truncated)"
 
 
     handleOut
         :: Nick
         -> Map Nick Paused
-        -> Either String (([Int], Either (Int -> VM) (Maybe Natural)), Memory)
+        -> Either String ([Int], Either (Int -> VM_) (Maybe Natural, Memory))
         -> IO String
     handleOut nk curr = \case
       Left e                  -> pure $ [P.s|error: %s|] e
-      Right ((outs, res), m') -> case res of
+      Right (outs, res) -> case res of
         Left next -> do
-          writeIORef v $ M.insert nk (Paused (Just next) m') curr
+          writeIORef v $ M.insert nk (NeedInput next) curr
           pure $
             [P.s|%s... awaiting input (!intcode push %s <inp> to continue)|]
               (displayOutput outs)
               (unNick nk)
-        Right (Just i) -> do
+        Right (Just i, m') -> do
           writeIORef v $ M.delete nk curr
           pure $
             [P.s|%s; halt, @0 = %d; %d fuel unused|]
               (displayOutput outs)
               (M.findWithDefault 0 0 (mRegs m'))
               i
-        Right Nothing -> do
-          writeIORef v $ M.insert nk (Paused Nothing m') curr
+        Right (Nothing, m') -> do
+          writeIORef v $ M.insert nk (NeedFuel m') curr
           pure $
-            [P.s|%s; ran out of fuel ('!intcode %s refuel' to continue)|]
+            [P.s|%s; ran out of fuel ('!intcode refuel %s' to continue)|]
               (displayOutput outs)
               (unNick nk)
 
@@ -237,3 +247,14 @@ feedPipe_ xs (FreeT p) = p >>= \case
       []   -> pure ([], Left g)
       y:ys -> feedPipe_ ys (g y)
     Free (PYieldF o q) -> first (o:) <$> feedPipe_ xs q
+
+
+runStateP :: Monad m => s -> Pipe i o u (StateT s m) a -> Pipe i o u m (a, s)
+runStateP s = fromRecPipe . runStateP_ s . toRecPipe
+
+runStateP_ :: Monad m => s -> RecPipe i o u (StateT s m) a -> RecPipe i o u m (a, s)
+runStateP_ s (FreeT p) = FreeT $ do
+    (q, s') <- runStateT p s
+    case q of
+      Pure x -> pure $ Pure (x, s')
+      Free l -> pure $ Free (fmap (runStateP_ s') l)
