@@ -17,6 +17,7 @@ module Advent.Module.Intcode.VM (
     Memory(..)
   , VM
   , stepForever
+  , stepN
   , maybeToEither
   , runProg
   ) where
@@ -27,16 +28,15 @@ import           Data.Conduino
 import           Data.Map                  (Map)
 import           Data.Traversable
 import           Data.Void
+import           GHC.Natural
 import           Linear
-import           Numeric.Natural
 import qualified Data.Conduino.Combinators as C
 import qualified Data.Map                  as M
 
-type VM = Pipe Int Int Void (StateT Memory (Either String)) ()
+type VM = Pipe Int Int Void (StateT Memory (Either String)) (Maybe Natural)
 
 data Memory = Mem
-    { mFuel :: Int
-    , mPos  :: Natural
+    { mPos  :: Natural
     , mBase :: Int
     , mRegs :: Map Natural Int
     }
@@ -56,9 +56,9 @@ instr :: Int -> Maybe Instr
 instr = (`M.lookup` instrMap)
 
 toNatural' :: MonadError String m => Int -> m Natural
-toNatural' x
-    | x < 0     = throwError $ "invalid position: " ++ show x
-    | otherwise = pure $ fromIntegral x
+toNatural' x = maybe (throwError e) pure $ toNatural x
+  where
+    e = "invalid position: " ++ show x
 
 readMem
     :: MonadState Memory m
@@ -71,12 +71,6 @@ peekMem
     :: MonadState Memory m
     => Natural -> m Int
 peekMem i = gets $ M.findWithDefault 0 i . mRegs
-
-useFuel :: (MonadState Memory m, MonadError String m) => m ()
-useFuel = do
-    u <- gets mFuel
-    unless (u > 0) $ throwError "ran out of fuel"
-    modify $ \m -> m { mFuel = u - 1 }
 
 -- | Defered version of 'withInput', to allow for maximum 'laziness'.
 withInputLazy
@@ -140,7 +134,6 @@ step
     :: forall m. (MonadError String m, MonadState Memory m)
     => Pipe Int Int Void m Bool
 step = do
-    useFuel
     (mo, x) <- (`divMod` 100) <$> readMem
     o  <- maybeToEither ("bad instr: " ++ show x) $ instr x
     (ir, lastMode) <- case o of
@@ -185,6 +178,23 @@ untilFalse x = go
       False -> pure ()
       True  -> go
 
+stepN
+    :: (MonadState Memory m, MonadError String m)
+    => Natural
+    -> Pipe Int Int Void m (Maybe Natural)
+stepN n = untilFalseN n step
+
+-- | Returns the 'fuel' remaining
+untilFalseN :: Monad m => Natural -> m Bool -> m (Maybe Natural)
+untilFalseN n x = go n
+  where
+    go i = case i `minusNaturalMaybe` 1 of
+      Nothing -> pure Nothing
+      Just j  -> x >>= \case
+        False -> pure (Just j)
+        True  -> go j
+
+
 runProg :: [Int] -> Memory -> Either String [Int]
 runProg inp m = flip evalStateT m $
       runPipe $ (C.sourceList inp *> throwError "whoops")
@@ -194,3 +204,7 @@ runProg inp m = flip evalStateT m $
 
 maybeToEither :: MonadError e m => e -> Maybe a -> m a
 maybeToEither e = maybe (throwError e) pure
+
+toNatural :: Integral a => a -> Maybe Natural
+toNatural x = fromIntegral x <$ guard (x >= 0)
+
