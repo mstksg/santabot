@@ -26,6 +26,7 @@ import           Data.Char
 import           Data.Conduino
 import           Data.Conduino.Internal
 import           Data.Foldable
+import           Data.Functor
 import           Data.IORef
 import           Data.List
 import           Data.List.NonEmpty                 (NonEmpty(..))
@@ -184,16 +185,20 @@ intcodeBot mgr v = C
     displayOutput (splitAt maxOut->(out, rest))
         | null out         = "<no output>"
         -- | all isPrint out' = [P.s|output: %s (%s)|] out' outarr
-        | printAsString = [P.s|output: %s%s|] outStr truncString
+        | printAsString = [P.s|output: %s%s|] editNewlines truncString
         | otherwise        = [P.s|output: %s%s|] outarr truncString
       where
         printAsString = and
           [ all inBounds out
           -- , all isPrint outStr
           , length out > 2
-          , all isAscii outStr
+          , all isLatin1 outStr
           ]
         outStr = map chr out
+        editNewlines = outStr <&> \case
+          '\n' -> '⏎'
+          '\r' -> '⏎'
+          c    -> c
         inBounds c = c <= ord maxBound && c >= ord minBound
         (outarr, rest') = splitAt (maxOut * 2) $ intercalate "," (map show out)
         truncString
