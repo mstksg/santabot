@@ -189,7 +189,7 @@ intcodeBot mgr v = C
       where
         printAsString = and
           [ all inBounds out
-          , all isPrint outStr
+          -- , all isPrint outStr
           , length out > 2
           , all isAscii outStr
           ]
