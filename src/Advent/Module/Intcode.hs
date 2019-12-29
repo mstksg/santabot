@@ -111,7 +111,7 @@ maxFuel :: Natural
 maxFuel = 100000
 
 maxOut :: Int
-maxOut = 75
+maxOut = 150
 
 maxInput :: Int
 maxInput = 100000
@@ -190,7 +190,7 @@ intcodeBot mgr v = C
       where
         printAsString = and
           [ all inBounds out
-          -- , all isPrint outStr
+          , all (\c -> isPrint c || (c `elem` ['\n','\r'])) outStr
           , length out > 2
           , all isLatin1 outStr
           ]

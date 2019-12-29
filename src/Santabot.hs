@@ -60,6 +60,9 @@ import qualified Data.List.NonEmpty         as NE
 import qualified Data.Map                   as M
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
+import qualified Data.Text.Lazy             as TL
+import qualified Data.Text.Lazy.Builder     as TL
+import qualified HTMLEntities.Decoder       as HTML
 import qualified Language.Haskell.Printf    as P
 import qualified Numeric.Interval           as I
 import qualified Text.Megaparsec.Char.Lexer as P
@@ -149,7 +152,8 @@ dayTitle y d = runMaybeT $ do
       _ <- "--- Day "
       _ <- P.decimal @_ @_ @_ @Integer
       _ <- ": "
-      T.strip . T.pack <$> manyTill anySingle (try " ---")
+      rawTitle <- T.strip . T.pack <$> manyTill anySingle (try " ---")
+      pure . TL.toStrict . TL.toLazyText . HTML.htmlEncodedText $ rawTitle
 
 allPuzzles :: IO (Map Integer (Set Advent.Day))
 allPuzzles = do
