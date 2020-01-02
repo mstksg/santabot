@@ -195,7 +195,7 @@ challengeCountdown = A
     }
   where
     challengeEvent i = do
-        guard $ (mm == 12) || (mm == 11 && dd == 30)
+        guard $ (mm == 12 && dd < 26) || (mm == 11 && dd == 30)
         first (,yy) <$> do
           listToMaybe . mapMaybe (uncurry pick) $ evts
       where
