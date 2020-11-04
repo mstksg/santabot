@@ -33,10 +33,12 @@ library:
   source-dirs: src
   dependencies:
   - bytestring
+  - casing
   - conduino
   - conduit
   - containers
   - deepseq
+  - dhall
   - directory
   - filepath
   - finite-typelits
@@ -54,11 +56,13 @@ library:
   - mtl
   - nonempty-containers
   - parser-combinators
+  - prettyprinter
   - profunctors
   - random
   - servant
   - servant-client-core
   - simpleirc
+  - slack-api
   - stm
   - stm-chans
   - stm-conduit
@@ -71,8 +75,8 @@ library:
   - yaml
 
 executables:
-  santabot:
-    main:                santabot.hs
+  santabot-irc:
+    main:                santabot-irc.hs
     source-dirs:         app
     ghc-options:
     - -threaded
@@ -90,6 +94,28 @@ executables:
     - th-printf
     - time
     - yaml
+  santabot-slack:
+    main:                santabot-slack.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    # dependencies:
+    # - linklater
+    # - warp
+    # - aeson
+    # - conduit
+    # - containers
+    # - http-client-tls
+    # - http-conduit
+    # - mtl
+    # - santabot
+    # - text
+    # - th-printf
+    # - time
+    # - yaml
+
 
 # tests:
 #   santabot-test:

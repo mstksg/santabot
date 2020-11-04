@@ -17,7 +17,7 @@
 #
 # resolver: ./custom-snapshot.yaml
 # resolver: https://example.com/snapshots/2018-01-01.yaml
-resolver: nightly-2019-11-21
+resolver: lts-16.20
 
 # User packages to be built.
 # Various formats can be used as shown in the example below.
@@ -44,6 +44,8 @@ extra-deps:
 - simpleirc-0.3.1
 - conduino-0.2.0.0
 - list-transformer-1.0.6
+- prettyprinter-1.6.2
+# - linklater-4.0.0.2
 
 ghc-options:
   "$locals": -ddump-to-file -ddump-hi

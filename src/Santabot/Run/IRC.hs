@@ -3,7 +3,7 @@
 {-# LANGUAGE RecordWildCards     #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Santabot.Run (
+module Santabot.Run.IRC (
     launchIRC
   , respRaw
   ) where
@@ -34,21 +34,26 @@ ircConf
     -> Maybe String
     -> MVar ()
     -> TBMQueue Event
-    -> IrcConfig
-ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
+    -> IO IrcConfig
+ircConf channels nick pwd started eventQueue = do
+    idCounter <- newTVarIO 0
+    pure $ (mkDefaultConfig "irc.freenode.org" nick)
       { cChannels = channels
       , cPass     = pwd
-      , cEvents   = [Privmsg onMessage, Disconnect onDisc, Notice begin]
+      , cEvents   = [Privmsg (onMessage idCounter), Disconnect onDisc, Notice begin]
       }
   where
-    onMessage _ IrcMessage{..} = void . runMaybeT $ do
+    onMessage idCounter _ IrcMessage{..} = void . runMaybeT $ do
         room  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mOrigin
         user  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mNick
-        lift . atomically . writeTBMQueue eventQueue . EMsg $
-          M { mRoom = room
-            , mUser = user
-            , mBody = body
-            }
+        lift . atomically $ do
+          mid <- stateTVar idCounter $ \i -> (i, i + 1)
+          writeTBMQueue eventQueue $ EMsg
+            M { mRoom = room
+              , mUser = user
+              , mBody = body
+              , mId   = mid
+              }
       where
         body = T.decodeUtf8 mMsg
     onDisc _ = atomically $ closeTBMQueue eventQueue
@@ -67,8 +72,9 @@ launchIRC
 launchIRC channels nick pwd tick bot = do
     eventQueue <- atomically $ newTBMQueue 1000000
     started    <- newEmptyMVar
+    cfg        <- ircConf channels nick pwd started eventQueue
 
-    Right irc <- connect (ircConf channels nick pwd started eventQueue) True True
+    Right irc <- connect cfg True True
 
     _ <- forkIO $ do
       () <- takeMVar started

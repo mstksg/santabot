@@ -11,7 +11,7 @@
 {-# LANGUAGE TypeInType                #-}
 {-# LANGUAGE ViewPatterns              #-}
 
-module Santabot (
+module Main.Commands (
     puzzleLink
   , puzzleThread
   , capTimeBot
@@ -48,6 +48,7 @@ import           Data.Set                   (Set)
 import           Data.Text                  (Text)
 import           Data.Time                  as Time
 import           Debug.Trace
+import           Numeric.Natural
 import           Santabot.Bot
 import           Servant.API
 import           Servant.Client.Core
@@ -269,17 +270,18 @@ boardCapped = risingEdgeAlert "capped" 1 True
 privateCapped
     :: MonadIO m
     => String     -- ^ session key
-    -> Integer    -- ^ leaderboard ID
+    -> Text       -- ^ leaderboard name
+    -> Natural    -- ^ leaderboard ID
     -> Maybe String     -- ^ leaderboard join code
     -> Alert m
-privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigger response
+privateCapped tok lname lbid joinCode = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
       putStrLn $ [P.s|[PRIVATE CAP DETECTION] Getting private leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
       mlb <- either (const Nothing) Just <$>
-        runAoC (defaultAoCOpts y tok) (AoCLeaderboard lbid)
+        runAoC (defaultAoCOpts y tok) (AoCLeaderboard (fromIntegral lbid))
       pure $ mlb >>= \lb -> do
         let dayMap = M.take 10 . flip foldMap (lbMembers lb) $ \LBM{..} ->
               flip foldMap (M.lookup d lbmCompletion) $ \pts ->
@@ -291,9 +293,13 @@ privateCapped tok lbid joinCode = risingEdgeAlert "private-capped" 5 False trigg
         globalCap <- (snd =<<) <$> getCapTime y d
         liftIO $ print globalCap
         pure . T.pack $
-          [P.s|Congrats to IRC Board (%d%s) Top 10 of %04d day %d! %s|]
-            lbid (foldMap ("-" <>) joinCode)
-            y (dayInt d) (T.unpack (lbString globalCap))
+          [P.s|Congrats to %s Board (%d%s) Top 10 of %04d day %d! %s|]
+            (T.unpack lname)
+            lbid
+            (foldMap ("-" <>) joinCode)
+            y
+            (dayInt d)
+            (T.unpack (lbString globalCap))
       where
         lbString cap = T.intercalate ", "
                      . zipWith mkStr [(1::Int)..]

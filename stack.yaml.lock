@@ -32,9 +32,16 @@ packages:
       sha256: 7d2a46b5ade8b57a62888af490d6fb20b217e6fa92b5bf40d53c6e9fd7a3809c
   original:
     hackage: list-transformer-1.0.6
+- completed:
+    hackage: prettyprinter-1.6.2@sha256:d9fa76aebce33c5c179a66128dfb5639e9257325d11c68569c6574dd8e112cde,5459
+    pantry-tree:
+      size: 2194
+      sha256: d84bf9b50055f5fff831f48b447737eb41bfff144352b6a0c6dee08b43d04d96
+  original:
+    hackage: prettyprinter-1.6.2
 snapshots:
 - completed:
-    size: 421719
-    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/nightly/2019/11/21.yaml
-    sha256: 57f1cd05f75cf10f12aab0459d4357bac8c0720484566d42d95c84cbda39ec8f
-  original: nightly-2019-11-21
+    size: 532177
+    url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/16/20.yaml
+    sha256: 0e14ba5603f01e8496e8984fd84b545a012ca723f51a098c6c9d3694e404dc6d
+  original: lts-16.20
