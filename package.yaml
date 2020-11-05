@@ -26,19 +26,23 @@ ghc-options:
 - -Werror=incomplete-patterns
 
 dependencies:
-- base >= 4.7 && < 5
 - advent-of-code-api >= 0.2.7
+- aeson
+- base >= 4.7 && < 5
+- casing
+- containers
+- dhall
+- mtl
+- prettyprinter
+- text
 
 library:
   source-dirs: src
   dependencies:
   - bytestring
-  - casing
   - conduino
   - conduit
-  - containers
   - deepseq
-  - dhall
   - directory
   - filepath
   - finite-typelits
@@ -53,21 +57,20 @@ library:
   - machines
   - megaparsec
   - modern-uri
-  - mtl
   - nonempty-containers
   - parser-combinators
-  - prettyprinter
   - profunctors
   - random
   - servant
   - servant-client-core
   - simpleirc
-  - slack-api
   - stm
   - stm-chans
+  - http-api-data
   - stm-conduit
+  - warp
   - tagsoup
-  - text
+  - servant-server
   - th-printf
   - time
   - transformers
@@ -83,17 +86,15 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - aeson
     - conduit
     - containers
     - http-client-tls
     - http-conduit
-    - mtl
     - santabot
-    - text
     - th-printf
     - time
     - yaml
+
   santabot-slack:
     main:                santabot-slack.hs
     source-dirs:         app
@@ -101,20 +102,17 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
-    # dependencies:
-    # - linklater
+    dependencies:
     # - warp
     # - aeson
-    # - conduit
+    - conduit
     # - containers
-    # - http-client-tls
-    # - http-conduit
-    # - mtl
-    # - santabot
-    # - text
-    # - th-printf
-    # - time
-    # - yaml
+    - http-client-tls
+    - http-conduit
+    - santabot
+    - th-printf
+    - time
+    - yaml
 
 
 # tests:

@@ -216,8 +216,8 @@ challengeCountdown = A
       CEMinute -> (False, [P.s|One minute until Day %d challenge!|]  (dayInt d)                   )
       CEStart  -> (True , [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d))
 
-eventCountdown :: (MonadIO m, MonadReader Phrasebook m) => Alert m
-eventCountdown = A
+eventCountdown :: (MonadIO m, MonadReader Phrasebook m) => Maybe Natural -> Alert m
+eventCountdown lim = A
     { aTrigger = pure . countdownEvent
     , aResp    = fmap (True,) . addSantaPhrase . T.pack . uncurry displayCE
     }
@@ -225,16 +225,19 @@ eventCountdown = A
     countdownEvent i = do
         guard $ LocalTime d midnight `I.member` i
         guard $ m < 12
-        (,y) <$> daysLeft
+        guard $ daysLeft > 0
+        forM_ lim $ \maxDay ->
+          guard $ daysLeft <= fromIntegral maxDay
+        pure (daysLeft, y)
       where
         d        = localDay $ I.sup i
         (y,m,_)  = toGregorian d
-        daysLeft = packFinite @14 $ (fromGregorian y 12 1 `diffDays` d) - 1
+        daysLeft = (fromGregorian y 12 1 `diffDays` d)
 
-    displayCE d = [P.s|%d day%s left until Advent of Code %d!|] n suff
+    displayCE :: Integer -> Integer -> String
+    displayCE d = [P.s|%d day%s left until Advent of Code %d!|] d suff
       where
-        n = getFinite d + 1
-        suff | n == 1    = "" :: String
+        suff | d == 1    = "" :: String
              | otherwise = "s"
 
 getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))

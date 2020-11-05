@@ -7,3 +7,4 @@ data/timeout.log
 cache
 *~
 *.dump*
+tags

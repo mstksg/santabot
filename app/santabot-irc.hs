@@ -13,7 +13,7 @@ import           Data.IORef
 import           Data.Map                              (Map)
 import           Data.Time.Format
 import           GHC.Generics
-import           Main.Bot
+import           Main.Master
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Conduit
 import           Numeric.Natural

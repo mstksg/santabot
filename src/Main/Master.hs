@@ -5,7 +5,7 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-module Main.Bot (
+module Main.Master (
     masterBot
   , BotConf(..)
   ) where
@@ -36,7 +36,6 @@ import qualified Dhall                      as D
 import qualified Language.Haskell.Printf    as P
 import qualified Text.Casing                as Case
 
-
 data BotConf = BotConf
     { bcName        :: T.Text           -- ^ name for instance
     , bcAuthor      :: T.Text           -- ^ author name
@@ -45,6 +44,7 @@ data BotConf = BotConf
     , bcSession     :: Maybe String     -- ^ AoC session key
     , bcLeaderboard :: Maybe Natural    -- ^ AoC Leaderboard Number
     , bcJoinCode    :: Maybe String     -- ^ AoC Leaderboard Join Code
+    , bcCountdown   :: Maybe Natural    -- ^ minimum day for countdown
     }
   deriving Generic
 
@@ -85,7 +85,7 @@ masterBot BotConf{..} mgr intcodeMap phrasebook = runReaderC phrasebook . mergeB
               (formatTime defaultTimeLocale "%H:%M:%S on %a, %-d %b %Y" t)
         ] ++ foldMap (:[]) (mkLeaderboard <$> bcLeaderboard <*> bcJoinCode)
     , alertBot bcAlerts challengeCountdown
-    , alertBot bcAlerts eventCountdown
+    , alertBot bcAlerts (eventCountdown bcCountdown)
     , alertBot bcAlerts boardCapped
     , maybe idBot (alertBot bcAlerts) $
         privateCapped <$> bcSession <*> pure bcName <*> bcLeaderboard <*> pure bcJoinCode

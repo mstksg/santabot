@@ -13,12 +13,12 @@ import           Data.IORef
 import           Data.Map                              (Map)
 import           Data.Time.Format
 import           GHC.Generics
-import           Main.Bot
+import           Main.Master
 import           Network.HTTP.Client.TLS
 import           Network.HTTP.Conduit
 import           Numeric.Natural
 import           Santabot.Bot
-import           Santabot.Run.IRC
+import           Santabot.Run.Slack
 import qualified Data.Aeson                            as A
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
@@ -33,8 +33,9 @@ import qualified Language.Haskell.Printf               as P
 import qualified Text.Casing                           as Case
 
 data Conf = Conf
-    { cTick        :: Natural          -- ^ in seconds
+    { cTick        :: Natural            -- ^ in seconds
     , cToken       :: T.Text             -- ^ API token
+    , cPort        :: Natural
     , cBotConf     :: BotConf
     }
   deriving Generic
@@ -63,11 +64,10 @@ main = do
     PP.putDoc $ D.prettyExpr (D.embed D.inject c)
     putStrLn ""
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
-    print phrasebook
-    -- c@Conf{..} <- Y.decodeFileThrow "santabot-slack-conf.yaml"
-    -- T.putStrLn . T.decodeUtf8 . Y.encode $ c
-    -- phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
-    -- mgr <- newTlsManager
-    -- intcodeMap <- newIORef mempty
-    -- launchIRC (toList (bcChannels cBotConf)) cNick cPassword (cTick * 1000000)
-    --     (masterBot cBotConf mgr intcodeMap phrasebook)
+    mgr <- newTlsManager
+    intcodeMap <- newIORef mempty
+    launchSlack
+      mgr
+      (fromIntegral cPort)
+      (fromIntegral cTick * 1000000)
+      (masterBot cBotConf mgr intcodeMap phrasebook)
