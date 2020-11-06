@@ -8,3 +8,4 @@ cache
 *~
 *.dump*
 tags
+.history

@@ -1,6 +1,7 @@
 {-# LANGUAGE ApplicativeDo     #-}
 {-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
@@ -8,55 +9,36 @@
 module Main.Master (
     masterBot
   , BotConf(..)
+  , AlertBot(..)
+  , CommandBot(..)
   ) where
 
 import           Advent
 import           Advent.Module.Intcode
+import           Control.Monad.IO.Unlift
 import           Control.Monad.Reader
 import           Data.Conduit.Lift
-import           Data.Functor.Contravariant
 import           Data.IORef
-import           Data.List.NonEmpty         (NonEmpty(..))
-import           Data.Map                   (Map)
+import           Data.Map                (Map)
 import           Data.Time.Format
 import           GHC.Generics
 import           Main.Commands
-import           Network.HTTP.Client.TLS
 import           Network.HTTP.Conduit
 import           Numeric.Natural
 import           Santabot.Bot
-import qualified Data.Aeson                 as A
-import qualified Data.List.NonEmpty         as NE
-import qualified Data.Set                   as S
-import qualified Data.Text                  as T
-import qualified Data.Text.Encoding         as T
-import qualified Data.Text.IO               as T
-import qualified Data.Yaml                  as Y
-import qualified Dhall                      as D
-import qualified Language.Haskell.Printf    as P
-import qualified Text.Casing                as Case
+import qualified Data.Set                as S
+import qualified Data.Text               as T
+import qualified Dhall                   as D
+import qualified Language.Haskell.Printf as P
+import qualified Text.Casing             as Case
 
 data BotConf = BotConf
     { bcName        :: T.Text           -- ^ name for instance
-    , bcAuthor      :: T.Text           -- ^ author name
-    , bcHome        :: String           -- ^ "home" channel
     , bcAlerts      :: String           -- ^ channel to send alerts to
-    , bcSession     :: Maybe String     -- ^ AoC session key
-    , bcLeaderboard :: Maybe Natural    -- ^ AoC Leaderboard Number
-    , bcJoinCode    :: Maybe String     -- ^ AoC Leaderboard Join Code
-    , bcCountdown   :: Maybe Natural    -- ^ minimum day for countdown
+    , bcCommandBots :: [CommandBot]
+    , bcAlertBots   :: [AlertBot]
     }
   deriving Generic
-
-instance A.FromJSON BotConf where
-    parseJSON = A.genericParseJSON A.defaultOptions
-      { A.fieldLabelModifier = A.camelTo2 '-' . drop 2
-      }
-
-instance A.ToJSON BotConf where
-    toJSON = A.genericToJSON A.defaultOptions
-      { A.fieldLabelModifier = A.camelTo2 '-' . drop 2
-      }
 
 instance D.FromDhall BotConf where
     autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
@@ -66,34 +48,114 @@ instance D.ToDhall BotConf where
     injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
       { D.fieldModifier = T.pack . Case.camel . drop 2 . T.unpack }
 
+data LeaderboardInfo = LeaderboardInfo
+    { liLeaderboard :: Natural
+    , liJoinCode    :: Maybe String
+    }
+  deriving Generic
+
+instance D.FromDhall LeaderboardInfo where
+    autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
+      { D.fieldModifier = T.pack . Case.camel . drop 2 . T.unpack }
+
+instance D.ToDhall LeaderboardInfo where
+    injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
+      { D.fieldModifier = T.pack . Case.camel . drop 2 . T.unpack }
+
+data CommandBot =
+      CBPuzzleLink
+    | CBPuzzleThread
+    | CBCapTimeBot
+    | CBNextPuzzle
+    | CBIntcode
+    | CBAbout T.Text
+    | CBTime
+    | CBLeaderboard LeaderboardInfo
+  deriving Generic
+
+instance D.FromDhall CommandBot where
+    autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+instance D.ToDhall CommandBot where
+    injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+data PrivateCappedInfo = PrivateCappedInfo
+    { pciSession :: String
+    , pciLeaderboardInfo :: LeaderboardInfo
+    }
+  deriving Generic
+
+instance D.FromDhall PrivateCappedInfo where
+    autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
+      { D.fieldModifier = T.pack . Case.camel . drop 3 . T.unpack }
+
+instance D.ToDhall PrivateCappedInfo where
+    injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
+      { D.fieldModifier = T.pack . Case.camel . drop 3 . T.unpack }
+
+data AlertBot =
+      ABChallengeCountdown (S.Set ChallengeEvent)
+    | ABEventCountdown (Maybe Natural)  -- ^ limit
+    | ABBoardCapped
+    | ABPrivateCapped PrivateCappedInfo
+  deriving Generic
+
+instance D.FromDhall AlertBot where
+    autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+instance D.ToDhall AlertBot where
+    injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+commandBotBot
+    :: (MonadUnliftIO m, MonadFail m, MonadReader Phrasebook m)
+    => T.Text
+    -> Manager
+    -> IORef (Map Nick Paused)
+    -> CommandBot
+    -> Command m
+commandBotBot name mgr intcodeMap = \case
+    CBPuzzleLink   -> puzzleLink
+    CBPuzzleThread -> puzzleThread
+    CBCapTimeBot   -> capTimeBot
+    CBNextPuzzle   -> nextPuzzle
+    CBIntcode      -> intcodeBot mgr intcodeMap
+    CBAbout t      -> simpleCommand "about" "Information about santabot" . addSantaPhrase $ t
+    CBTime         -> simpleCommand "time" "The current time on AoC servers" $ do
+      t <- liftIO aocServerTime
+      pure . T.pack $
+        [P.s|The current AoC server time (EST) is %s|]
+        (formatTime defaultTimeLocale "%H:%M:%S on %a, %-d %b %Y" t)
+    CBLeaderboard li -> simpleCommand "leaderboard" (name <> " leaderboard") $
+      addSantaPhrase =<< mkLeaderboard li
+  where
+    mkLeaderboard LeaderboardInfo{..} = do
+      Just y <- S.lookupMax <$> liftIO validYears
+      pure . T.pack $ case liJoinCode of
+        Just jc -> [P.s|Join the %s Leaderboard! Code %d-%s, viewable at https://adventofcode.com/%04d/leaderboard/private/view/%d|]
+          (T.unpack name) liLeaderboard jc y liLeaderboard
+        Nothing -> [P.s|View the %s Leaderboard! https://adventofcode.com/%04d/leaderboard/private/view/%d|]
+          (T.unpack name) y liLeaderboard
+
+alertBotBot
+    :: (MonadUnliftIO m, MonadReader Phrasebook m)
+    => T.Text
+    -> AlertBot
+    -> Alert m
+alertBotBot name = \case
+    ABChallengeCountdown evts -> challengeCountdown evts
+    ABEventCountdown lim      -> eventCountdown lim
+    ABBoardCapped             -> boardCapped
+    ABPrivateCapped PrivateCappedInfo{..} ->
+      privateCapped pciSession name
+        (liLeaderboard pciLeaderboardInfo)
+        (liJoinCode pciLeaderboardInfo)
+
 masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()
 masterBot BotConf{..} mgr intcodeMap phrasebook = runReaderC phrasebook . mergeBots $
-    [ commandBots $
-        [ puzzleLink
-        , puzzleThread
-        , capTimeBot
-        , nextPuzzle
-        , intcodeBot mgr intcodeMap
-        , simpleCommand "about" "Information about santabot" . addSantaPhrase . T.pack $
-            [P.s|I'm a helper bot for %s and AoC util! Developed by %s, source at https://github.com/mstksg/santabot. All commands also work in private message.|]
-            bcHome
-            (T.unpack bcAuthor)
-        , simpleCommand "time" "The current time on AoC servers" $ do
-            t <- liftIO aocServerTime
-            pure . T.pack $
-              [P.s|The current AoC server time (EST) is %s|]
-              (formatTime defaultTimeLocale "%H:%M:%S on %a, %-d %b %Y" t)
-        ] ++ foldMap (:[]) (mkLeaderboard <$> bcLeaderboard <*> bcJoinCode)
-    , alertBot bcAlerts challengeCountdown
-    , alertBot bcAlerts (eventCountdown bcCountdown)
-    , alertBot bcAlerts boardCapped
-    , maybe idBot (alertBot bcAlerts) $
-        privateCapped <$> bcSession <*> pure bcName <*> bcLeaderboard <*> pure bcJoinCode
-    ]
-  where
-    mkLeaderboard lb jc = simpleCommand "leaderboard" (bcName <> " leaderboard") . (addSantaPhrase =<<) $ do
-      Just y <- S.lookupMax <$> liftIO validYears
-      pure . T.pack $
-        [P.s|Join the %s Leaderboard! Code %d-%s, viewable at https://adventofcode.com/%04d/leaderboard/private/view/382266.|]
-        (T.unpack bcName) lb jc y
+      commandBots (commandBotBot bcName mgr intcodeMap <$> bcCommandBots)
+    : map (alertBot bcAlerts . alertBotBot bcName) bcAlertBots
 

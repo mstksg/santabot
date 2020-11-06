@@ -40,16 +40,6 @@ data Conf = Conf
     }
   deriving Generic
 
-instance A.FromJSON Conf where
-    parseJSON = A.genericParseJSON A.defaultOptions
-      { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
-      }
-
-instance A.ToJSON Conf where
-    toJSON = A.genericToJSON A.defaultOptions
-      { A.fieldLabelModifier = A.camelTo2 '-' . drop 1
-      }
-
 instance D.FromDhall Conf where
     autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
       { D.fieldModifier = T.pack . Case.camel . drop 1 . T.unpack }

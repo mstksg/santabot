@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE LambdaCase                #-}
@@ -16,6 +17,7 @@ module Main.Commands (
   , puzzleThread
   , capTimeBot
   , nextPuzzle
+  , ChallengeEvent(..)
   , challengeCountdown
   , eventCountdown
   , boardCapped
@@ -37,7 +39,6 @@ import           Control.Monad
 import           Control.Monad.Combinators
 import           Control.Monad.Reader
 import           Control.Monad.Trans.Maybe
-import           Data.Bifunctor
 import           Data.Char
 import           Data.Finite
 import           Data.Foldable
@@ -48,6 +49,7 @@ import           Data.Set                   (Set)
 import           Data.Text                  (Text)
 import           Data.Time                  as Time
 import           Debug.Trace
+import           GHC.Generics
 import           Numeric.Natural
 import           Santabot.Bot
 import           Servant.API
@@ -63,6 +65,7 @@ import qualified Data.Set                   as S
 import qualified Data.Text                  as T
 import qualified Data.Text.Lazy             as TL
 import qualified Data.Text.Lazy.Builder     as TL
+import qualified Dhall                      as D
 import qualified HTMLEntities.Decoder       as HTML
 import qualified Language.Haskell.Printf    as P
 import qualified Numeric.Interval           as I
@@ -186,37 +189,54 @@ data ChallengeEvent = CEHour
                     | CETenMin
                     | CEMinute
                     | CEStart
-  deriving Show
+  deriving (Show, Eq, Ord, Enum, Bounded, Generic)
 
-challengeCountdown :: (MonadIO m, MonadReader Phrasebook m) => Alert m
-challengeCountdown = A
+instance D.FromDhall ChallengeEvent where
+    autoWith _ = D.genericAutoWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+instance D.ToDhall ChallengeEvent where
+    injectWith _ = D.genericToDhallWith $ D.defaultInterpretOptions
+      { D.constructorModifier = T.drop 2 }
+
+ceTrigger :: Time.Day -> ChallengeEvent -> Maybe (LocalTime, Advent.Types.Day)
+ceTrigger d = \case
+    CEStart  -> (LocalTime d midnight,) <$> mkDay (fromIntegral dd)
+    CEHour   -> (LocalTime d (TimeOfDay 23 0  0),) <$> mkDay (fromIntegral dd')
+    CETenMin -> (LocalTime d (TimeOfDay 23 50 0),) <$> mkDay (fromIntegral dd')
+    CEMinute -> (LocalTime d (TimeOfDay 23 59 0),) <$> mkDay (fromIntegral dd')
+  where
+    (_ ,_,dd ) = toGregorian d
+    (_ ,_,dd') = toGregorian (succ d)
+
+challengeCountdown
+    :: (MonadIO m, MonadReader Phrasebook m)
+    => S.Set ChallengeEvent
+    -> Alert m
+challengeCountdown evtSet = A
     { aTrigger = pure . challengeEvent
     , aResp    = traverse (addSantaPhrase . T.pack)
-               . uncurry displayCE
+               . uncurry (flip displayCE)
     }
   where
     challengeEvent i = do
         guard $ (mm == 12 && dd < 26) || (mm == 11 && dd == 30)
-        first (,yy) <$> do
-          listToMaybe . mapMaybe (uncurry pick) $ evts
+        M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $
+          M.fromSet id evtSet
       where
         d = localDay $ I.sup i
         (yy ,mm, dd ) = toGregorian d
-        (_  ,_  ,dd') = toGregorian (succ d)
-        evts =
-          [ (LocalTime d midnight           , (,CEStart ) <$> mkDay (fromIntegral dd ))
-          , (LocalTime d (TimeOfDay 23 0  0), (,CEHour  ) <$> mkDay (fromIntegral dd'))
-          , (LocalTime d (TimeOfDay 23 50 0), (,CETenMin) <$> mkDay (fromIntegral dd'))
-          , (LocalTime d (TimeOfDay 23 59 0), (,CEMinute) <$> mkDay (fromIntegral dd'))
-          ]
-        pick t e = guard (t `I.member` i) *> e
+        pick (t, d') = (d', yy) <$ guard (t `I.member` i)
     displayCE (d, yr) = \case
       CEHour   -> (False, [P.s|One hour until Day %d challenge!|]    (dayInt d)                   )
       CETenMin -> (False, [P.s|Ten minutes until Day %d challenge!|] (dayInt d)                   )
       CEMinute -> (False, [P.s|One minute until Day %d challenge!|]  (dayInt d)                   )
       CEStart  -> (True , [P.s|Day %d challenge now online at %s !|] (dayInt d) (displayLink yr d))
 
-eventCountdown :: (MonadIO m, MonadReader Phrasebook m) => Maybe Natural -> Alert m
+eventCountdown
+    :: (MonadIO m, MonadReader Phrasebook m)
+    => Maybe Natural
+    -> Alert m
 eventCountdown lim = A
     { aTrigger = pure . countdownEvent
     , aResp    = fmap (True,) . addSantaPhrase . T.pack . uncurry displayCE
