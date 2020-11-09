@@ -4,32 +4,17 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE RecordWildCards   #-}
 
-import           Advent
-import           Advent.Module.Intcode
-import           Control.Monad.Reader
-import           Data.Conduit.Lift
-import           Data.Foldable
 import           Data.IORef
-import           Data.Map                              (Map)
-import           Data.Time.Format
 import           GHC.Generics
 import           Main.Master
 import           Network.HTTP.Client.TLS
-import           Network.HTTP.Conduit
 import           Numeric.Natural
-import           Santabot.Bot
 import           Santabot.Run.Slack
-import qualified Data.Aeson                            as A
 import qualified Data.Set                              as S
 import qualified Data.Text                             as T
-import qualified Data.Text.Encoding                    as T
-import qualified Data.Text.IO                          as T
-import qualified Data.Text.Prettyprint.Doc             as PP
 import qualified Data.Text.Prettyprint.Doc.Render.Text as PP
-import qualified Data.Yaml                             as Y
 import qualified Dhall                                 as D
 import qualified Dhall.Pretty                          as D
-import qualified Language.Haskell.Printf               as P
 import qualified Text.Casing                           as Case
 
 data Conf = Conf

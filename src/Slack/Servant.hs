@@ -18,6 +18,7 @@ module Slack.Servant (
   , SetTopic(..)
   , PostMessage(..)
   , slackServerClient
+  , slackServerApi
   ) where
 
 import           Data.Char
@@ -29,10 +30,8 @@ import           Servant.API
 import           Servant.API.Generic
 import           Servant.Client.Core.RunClient
 import           Servant.Client.Generic
-import           Servant.Server
 import           Web.Internal.FormUrlEncoded
 import qualified Data.Aeson                    as A
-import qualified Data.HashMap.Lazy             as HM
 import qualified Data.Text                     as T
 import qualified Text.Casing                   as Case
 

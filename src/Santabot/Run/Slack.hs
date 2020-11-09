@@ -11,26 +11,17 @@ module Santabot.Run.Slack (
   , TokenSet(..)
   ) where
 
--- import qualified Web.Slack                    as Slack
--- import qualified Web.Slack.Message            as Slack
--- import qualified Web.Slack.WebAPI             as Slack
 import           Advent
-import           Control.Applicative
 import           Control.Concurrent
 import           Control.Concurrent.STM
 import           Control.Concurrent.STM.TBMQueue
 import           Control.Monad
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.Maybe
 import           Data.Char
 import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
-import           Data.Maybe
 import           Data.Proxy
 import           Data.Text                       (Text)
-import           Debug.Trace
 import           Network.Wai.Handler.Warp        (run)
 import           Santabot.Bot
 import           Servant.API
@@ -39,17 +30,12 @@ import           Servant.Client
 import           Servant.Server
 import           Web.Internal.FormUrlEncoded
 import qualified Data.Aeson                      as A
-import qualified Data.Aeson.Text                 as A
-import qualified Data.ByteString                 as BS
 import qualified Data.Conduit.Combinators        as C
 import qualified Data.IntMap                     as IM
 import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Text                       as T
-import qualified Data.Text.Encoding              as T
-import qualified Data.Text.Lazy.IO               as TL
 import qualified Dhall                           as D
-import qualified Language.Haskell.Printf         as P
 import qualified Network.HTTP.Client             as HTTP
 import qualified Slack.Servant                   as Slack
 import qualified Text.Casing                     as Case
