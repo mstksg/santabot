@@ -33,9 +33,12 @@ import qualified Language.Haskell.Printf               as P
 import qualified Text.Casing                           as Case
 
 data Conf = Conf
-    { cTick        :: Natural            -- ^ in seconds
-    , cToken       :: T.Text             -- ^ API token
+    { cTick        :: Natural              -- ^ in seconds
+    , cTokenSet    :: TokenSet
     , cPort        :: Natural
+    , cAppUser     :: T.Text                  -- ^ app user id
+    , cChannels    :: S.Set T.Text                -- ^ watched channels
+    , cTopicSuffix :: Maybe T.Text
     , cBotConf     :: BotConf
     }
   deriving Generic
@@ -60,4 +63,8 @@ main = do
       mgr
       (fromIntegral cPort)
       (fromIntegral cTick * 1000000)
+      cTokenSet
+      cAppUser
+      cTopicSuffix
+      cChannels
       (masterBot cBotConf mgr intcodeMap phrasebook)

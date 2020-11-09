@@ -42,12 +42,16 @@ library:
   - bytestring
   - conduino
   - conduit
+  - unordered-containers
   - deepseq
+  - deriving-aeson
   - directory
+  - servant-client
   - filepath
   - finite-typelits
   - free
   - html-entities
+  - http-api-data
   - http-client
   - http-client-tls
   - http-conduit
@@ -62,20 +66,19 @@ library:
   - profunctors
   - random
   - servant
-  - unliftio-core
   - servant-client-core
+  - servant-server
   - simpleirc
   - stm
   - stm-chans
-  - http-api-data
   - stm-conduit
-  - warp
   - tagsoup
-  - servant-server
   - th-printf
   - time
   - transformers
+  - unliftio-core
   - uri-bytestring
+  - warp
   - yaml
 
 executables:

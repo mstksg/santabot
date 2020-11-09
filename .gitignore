@@ -9,3 +9,4 @@ cache
 *.dump*
 tags
 .history
+*.json
