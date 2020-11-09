@@ -84,6 +84,7 @@ instance D.ToDhall CommandBot where
 data PrivateCappedInfo = PrivateCappedInfo
     { pciSession :: String
     , pciLeaderboardInfo :: LeaderboardInfo
+    , pciCap :: Natural
     }
   deriving Generic
 
@@ -153,6 +154,7 @@ alertBotBot name = \case
       privateCapped pciSession name
         (liLeaderboard pciLeaderboardInfo)
         (liJoinCode pciLeaderboardInfo)
+        pciCap
 
 masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()
 masterBot BotConf{..} mgr intcodeMap phrasebook = runReaderC phrasebook . mergeBots $

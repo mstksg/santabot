@@ -112,19 +112,19 @@ slackServer appUser eventQueue idCounter channels = slashCommands :<|> eventCall
           A.Error   _                 -> pure ()
           A.Success msg@Slack.Message{..} ->
             let properChannel
-                  | mChannel `S.member` channels = not mAppMention
-                  | otherwise                    = mAppMention
-            in  when properChannel . liftIO $ do
-                  print msg
-                  atomically $ do
-                    mid    <- stateTVar idCounter $ \i -> (i, i + 1)
-                    writeTBMQueue eventQueue $ EMsg
-                      M { mRoom = T.unpack mChannel
-                        , mUser = "<@" <> T.unpack mUser <> ">"       -- eh
-                        , mBody = maybe mText T.strip $
-                            T.stripPrefix mentionStr mText
-                        , mId   = mid
-                        }
+                  | mChannel `S.member` channels = mType == Slack.MTChannel
+                  | otherwise                    = mType /= Slack.MTChannel
+            in  do when properChannel . liftIO $ do
+                     print msg
+                     atomically $ do
+                       mid    <- stateTVar idCounter $ \i -> (i, i + 1)
+                       writeTBMQueue eventQueue $ EMsg
+                         M { mRoom = T.unpack mChannel
+                           , mUser = "<@" <> T.unpack mUser <> ">"       -- eh
+                           , mBody = maybe mText T.strip $
+                               T.stripPrefix mentionStr mText
+                           , mId   = mid
+                           }
         pure A.Null
     mentionStr = "<@" <> appUser <> ">"
 

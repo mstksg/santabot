@@ -263,7 +263,7 @@ eventCountdown lim = A
 getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))
 getCapTime y d = liftIO $ do
     t <- aocServerTime
-    putStrLn $ [P.s|[CAP DETECTION] Getting leaderboard cap time for %04d %d at %s|]
+    putStrLn $ [P.s|[CAP DETECTION] Getting global leaderboard cap time for %04d %d at %s|]
                   y (dayInt d) (show t)
     mlb <- either (const Nothing) Just <$>
       runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
@@ -287,7 +287,7 @@ boardCapped = risingEdgeAlert "capped" 1 True
     response y d capTime = liftIO $ do
       linkUrl <- fromMaybe "thread not yet available" <$> getPostLink y d
       pure . T.pack $
-        [P.s|Leaderboard for Day %d is now capped at %s (%s)!|]
+        [P.s|Global Leaderboard for Day %d is now capped at %s (%s)!|]
           (dayInt d) (prettyTime capTime) linkUrl
 
 privateCapped
@@ -296,8 +296,9 @@ privateCapped
     -> Text       -- ^ leaderboard name
     -> Natural    -- ^ leaderboard ID
     -> Maybe String     -- ^ leaderboard join code
+    -> Natural    -- ^ number to cap
     -> Alert m
-privateCapped tok lname lbid joinCode = risingEdgeAlert "private-capped" 5 False trigger response
+privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
@@ -306,20 +307,21 @@ privateCapped tok lname lbid joinCode = risingEdgeAlert "private-capped" 5 False
       mlb <- either (const Nothing) Just <$>
         runAoC (defaultAoCOpts y tok) (AoCLeaderboard (fromIntegral lbid))
       pure $ mlb >>= \lb -> do
-        let dayMap = M.take 10 . flip foldMap (lbMembers lb) $ \LBM{..} ->
+        let dayMap = M.take (fromIntegral cap) . flip foldMap (lbMembers lb) $ \LBM{..} ->
               flip foldMap (M.lookup d lbmCompletion) $ \pts ->
                 flip foldMap (M.lookup Part2 pts) $ \tt ->
                   M.singleton tt (lbmId, lbmName)
-        guard $ M.size dayMap >= 10
+        guard $ M.size dayMap >= fromIntegral cap
         pure dayMap
     response y d capMap = do
         globalCap <- (snd =<<) <$> getCapTime y d
         liftIO $ print globalCap
         pure . T.pack $
-          [P.s|Congrats to %s Board (%d%s) Top 10 of %04d day %d! %s|]
+          [P.s|Congrats to %s Board (%d%s) Top %d of %04d day %d! %s|]
             (T.unpack lname)
             lbid
             (foldMap ("-" <>) joinCode)
+            cap
             y
             (dayInt d)
             (T.unpack (lbString globalCap))
