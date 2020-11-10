@@ -326,9 +326,9 @@ privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 F
             (dayInt d)
             (T.unpack (lbString globalCap))
       where
-        lbString cap = T.intercalate ", "
-                     . zipWith mkStr [(1::Int)..]
-                     . M.toList $ capMap
+        lbString mcap = T.intercalate ", "
+                      . zipWith mkStr [(1::Int)..]
+                      . M.toList $ capMap
           where
             mkStr place (tt, (i, u)) = T.pack $ [P.s|%s%d%s %s (%s)|] openb place closeb uString tString
               where
@@ -336,7 +336,7 @@ privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 F
                 tString = formatTime defaultTimeLocale "%H:%M:%S"
                         . utcToLocalTime (read "EST")
                         $ tt
-                (openb, closeb) = case cap of
+                (openb, closeb) = case mcap of
                   Just cc | cc < tt -> ("[", "]")
                   _                 -> ("{", "}")
 

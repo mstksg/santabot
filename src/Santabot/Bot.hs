@@ -54,7 +54,6 @@ import qualified Numeric.Interval          as I
 data Message = M { mRoom :: String
                  , mUser :: String
                  , mBody :: Text
-                 , mId   :: Int        -- ^ unique ID for messages, to associate responses
                  }
   deriving Show
 
@@ -70,7 +69,6 @@ data RespType = RTMessage
 data Resp = R { rRoom   :: String
               , rType   :: RespType
               , rBody   :: Text
-              , rSource :: Maybe Int   -- ^ the time that prompted this, or the message it is responding to
               }
   deriving Show
 
@@ -100,16 +98,15 @@ commandBot C{..} = C.concatMapM parseMe
     parseMe = \case
       EMsg m
         | Just (_, "", rest) <- T.commonPrefixes ("!" <> T.pack cName <> " ") (mBody m <> " ")
-        -> Just . (mId m,mRoom m,) <$> cParse (m { mBody = T.strip rest })
+        -> Just . (mRoom m,) <$> cParse (m { mBody = T.strip rest })
       _ -> pure Nothing
-    displayMe (i, room, r) = case r of
+    displayMe (room, r) = case r of
       Left  e -> pure R
         { rRoom = room
         , rType = RTMessage
         , rBody = T.pack $ [P.s|%s: %s (!help %s for help)|] cName (T.unpack e) cName
-        , rSource = Just i
         }
-      Right b -> R room RTMessage <$> cResp b <*> pure (Just i)
+      Right b -> R room RTMessage <$> cResp b
 
 helpBot
     :: Applicative m
@@ -165,7 +162,7 @@ alertBot
     -> Bot m ()
 alertBot c A{..} = intervals
                 .| C.concatMapM aTrigger
-                .| C.mapM (fmap (\(rt, b) -> R c (toResp rt) b Nothing) . aResp)
+                .| C.mapM (fmap (\(rt, b) -> R c (toResp rt) b) . aResp)
   where
     toResp = \case
       False -> RTAction

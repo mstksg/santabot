@@ -31,7 +31,6 @@ import           Servant.Server
 import           Web.Internal.FormUrlEncoded
 import qualified Data.Aeson                      as A
 import qualified Data.Conduit.Combinators        as C
-import qualified Data.IntMap                     as IM
 import qualified Data.Map                        as M
 import qualified Data.Set                        as S
 import qualified Data.Text                       as T
@@ -87,20 +86,17 @@ commandPrefix cmd = case M.lookup cmd commandMap of
 slackServer
     :: Text                   -- ^ app user id, to strip if app_mention
     -> TBMQueue Event
-    -> TVar IM.Key
     -> S.Set Text                     -- ^ watched channels
     -> Server SlackApi
-slackServer appUser eventQueue idCounter channels = slashCommands :<|> eventCall
+slackServer appUser eventQueue channels = slashCommands :<|> eventCall
   where
     slashCommands sd@SlashData{..} = liftIO $ do
       putStrLn $ "Received data: " <> show sd
-      atomically $ do
-        mid    <- stateTVar idCounter $ \i -> (i, i + 1)
+      atomically $
         writeTBMQueue eventQueue $ EMsg
-          M { mRoom = T.unpack sdResponseUrl  -- hm, we should look up first! otherwise private
-            , mUser = "@" <> T.unpack sdUserName      -- hm..
+          M { mRoom = T.unpack sdResponseUrl
+            , mUser = T.unpack $ mentionStr sdUserName
             , mBody = commandPrefix sdCommand sdText
-            , mId   = mid
             }
       pure NoContent
     eventCall = \case
@@ -116,17 +112,15 @@ slackServer appUser eventQueue idCounter channels = slashCommands :<|> eventCall
                   | otherwise                    = mType /= Slack.MTChannel
             in  do when properChannel . liftIO $ do
                      print msg
-                     atomically $ do
-                       mid    <- stateTVar idCounter $ \i -> (i, i + 1)
+                     atomically $
                        writeTBMQueue eventQueue $ EMsg
                          M { mRoom = T.unpack mChannel
-                           , mUser = "<@" <> T.unpack mUser <> ">"       -- eh
+                           , mUser = T.unpack $ mentionStr mUser
                            , mBody = maybe mText T.strip $
-                               T.stripPrefix mentionStr mText
-                           , mId   = mid
+                               T.stripPrefix (mentionStr appUser) mText
                            }
         pure A.Null
-    mentionStr = "<@" <> appUser <> ">"
+    mentionStr nm = "<@" <> nm <> ">"
 
 
 data TokenSet = TokenSet
@@ -155,10 +149,9 @@ launchSlack
     -> IO ()
 launchSlack mgr port tick tokenSet appUser topic channels bot = do
     eventQueue <- atomically $ newTBMQueue 1000000
-    idCounter  <- newTVarIO 0
 
     _ <- forkIO $
-      run port $ serve slackApi (slackServer appUser eventQueue idCounter channels)
+      run port $ serve slackApi (slackServer appUser eventQueue channels)
 
     _ <- forkIO $ do
       threadDelay 5000000
