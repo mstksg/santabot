@@ -110,15 +110,15 @@ slackServer appUser eventQueue channels = slashCommands :<|> eventCall
             let properChannel
                   | mChannel `S.member` channels = mType == Slack.MTChannel
                   | otherwise                    = mType /= Slack.MTChannel
-            in  do when properChannel . liftIO $ do
-                     print msg
-                     atomically $
-                       writeTBMQueue eventQueue $ EMsg
-                         M { mRoom = T.unpack mChannel
-                           , mUser = T.unpack $ mentionStr mUser
-                           , mBody = maybe mText T.strip $
-                               T.stripPrefix (mentionStr appUser) mText
-                           }
+            in  when properChannel . liftIO $ do
+                  print msg
+                  atomically $
+                    writeTBMQueue eventQueue $ EMsg
+                      M { mRoom = T.unpack mChannel
+                        , mUser = T.unpack $ mentionStr mUser
+                        , mBody = maybe mText T.strip $
+                            T.stripPrefix (mentionStr appUser) mText
+                        }
         pure A.Null
     mentionStr nm = "<@" <> nm <> ">"
 
