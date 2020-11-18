@@ -1,9 +1,9 @@
 .stack-work/
 santabot.cabal
 santabot-conf.yaml
+/*.dhall
 data/wikitest.md
 data/timeout.log
-*.dhall
 cache
 *~
 *.dump*
