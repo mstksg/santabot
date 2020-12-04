@@ -181,21 +181,21 @@ responseHandler mgr TokenSet{..} topic R{..} = case rType of
             , stChannel = T.pack rRoom
             , stTopic   = rBody <> maybe "" ("\n" <>) topic
             }
-      void $ runClientM (ssaSetTopic setTopic) clientEnv
+      print =<< runClientM (ssaSetTopic setTopic) clientEnv
     RTMessage -> do
       let postMessage = Slack.PostMessage
             { pmToken   = tsBotToken
             , pmChannel = T.pack rRoom
             , pmText    = rBody
             }
-      void $ runClientM (ssaPostMessage postMessage) clientEnv
+      print =<< runClientM (ssaPostMessage postMessage) clientEnv
     RTAction -> do
       let postMessage = Slack.PostMessage
             { pmToken   = tsBotToken
             , pmChannel = T.pack rRoom
-            , pmText    = "/me " <> rBody
+            , pmText    = "** " <> rBody <> " **"
             }
-      void $ runClientM (ssaPostMessage postMessage) clientEnv
+      print =<< runClientM (ssaPostMessage postMessage) clientEnv
 
   where
     Slack.SlackServerApi{..} = Slack.slackServerClient

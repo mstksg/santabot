@@ -219,6 +219,7 @@ challengeCountdown evtSet = A
                . uncurry (flip displayCE)
     }
   where
+    challengeEvent :: I.Interval LocalTime -> Maybe (ChallengeEvent, (Advent.Day, Integer))
     challengeEvent i = do
         guard $ (mm == 12 && dd < 26) || (mm == 11 && dd == 30)
         M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $
