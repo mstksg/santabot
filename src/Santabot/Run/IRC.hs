@@ -1,3 +1,4 @@
+{-# LANGUAGE NumericUnderscores  #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE QuasiQuotes         #-}
 {-# LANGUAGE RecordWildCards     #-}
@@ -6,6 +7,7 @@
 module Santabot.Run.IRC (
     launchIRC
   , respRaw
+  , splitAll, splitUntil
   ) where
 
 import           Advent
@@ -16,8 +18,10 @@ import           Control.Concurrent.STM.TBMQueue
 import           Control.Monad
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Maybe
+import           Data.Bifunctor
 import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
+import           Data.List
 import           Network.SimpleIRC               as IRC
 import           Santabot.Bot
 import qualified Data.ByteString                 as BS
@@ -44,18 +48,40 @@ ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.or
     onMessage _ IrcMessage{..} = void . runMaybeT $ do
         room  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mOrigin
         user  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mNick
-        lift . atomically $
-          writeTBMQueue eventQueue $ EMsg
-            M { mRoom = room
-              , mUser = user
-              , mBody = body
-              }
+        let splitMsg = map T.unwords
+                     . splitAll (splitUntil T.length 300)
+                     $ T.words body
+        lift . forM_ splitMsg $ \msg -> do
+          atomically $
+            writeTBMQueue eventQueue $ EMsg
+              M { mRoom = room
+                , mUser = user
+                , mBody = msg
+                }
       where
         body = T.decodeUtf8 mMsg
     onDisc _ = atomically $ closeTBMQueue eventQueue
     begin _ _ = void $ tryPutMVar started ()
 
+splitAll :: ([a] -> ([a], [a])) -> [a] -> [[a]]
+splitAll f = go
+  where
+    go xs = case f xs of
+      (ys, zs)
+        | null ys || null zs -> ys : []
+        | otherwise          -> ys : go zs
 
+splitUntil
+    :: (a -> Int)
+    -> Int
+    -> [a]
+    -> ([a], [a])
+splitUntil f i = bimap (map snd) (map snd)
+               . span ((<= i) . fst)
+               . snd
+               . mapAccumL (\sm x -> let sm' = sm + f x
+                                     in (sm', (sm', x))
+                           ) 0
 
 -- | Begin the IRC process with stdout logging.
 launchIRC
@@ -83,7 +109,7 @@ launchIRC channels nick pwd tick bot = do
     runConduit $ sourceTBMQueue eventQueue
               .| bot
               .| C.map respRaw
-              .| C.mapM_ (sendRaw irc)
+              .| C.mapM_ (\r -> sendRaw irc r *> threadDelay 500_000)
               .| C.sinkNull
 
 -- | Need this until https://github.com/dom96/SimpleIRC/pull/29 is merged
