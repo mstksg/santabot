@@ -45,6 +45,7 @@ extra-deps:
 - conduino-0.2.0.0
 - list-transformer-1.0.6
 - prettyprinter-1.6.2
+- monoidal-containers-0.6.0.1
 # - linklater-4.0.0.2
 
 ghc-options:

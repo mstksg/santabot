@@ -153,7 +153,6 @@ alertBotBot name = \case
     ABPrivateCapped PrivateCappedInfo{..} ->
       privateCapped pciSession name
         (liLeaderboard pciLeaderboardInfo)
-        (liJoinCode pciLeaderboardInfo)
         pciCap
 
 masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()

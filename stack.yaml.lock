@@ -39,6 +39,13 @@ packages:
       sha256: d84bf9b50055f5fff831f48b447737eb41bfff144352b6a0c6dee08b43d04d96
   original:
     hackage: prettyprinter-1.6.2
+- completed:
+    hackage: monoidal-containers-0.6.0.1@sha256:ffdfae0fde7a08e9e314667a78d86454d2d23137d85f226ec6e757c190fb28ad,2583
+    pantry-tree:
+      size: 569
+      sha256: 61d5a73cb768aa4d59db7365418a2fc1bb24b8c3e53ca496372656b6ba4d31ab
+  original:
+    hackage: monoidal-containers-0.6.0.1
 snapshots:
 - completed:
     size: 532177

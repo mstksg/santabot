@@ -61,6 +61,7 @@ import           Text.Read                  (readMaybe)
 import qualified Data.Duration              as DD
 import qualified Data.List.NonEmpty         as NE
 import qualified Data.Map                   as M
+import qualified Data.Map.Monoidal          as MoMa
 import qualified Data.Set                   as S
 import qualified Data.Text                  as T
 import qualified Data.Text.Lazy             as TL
@@ -296,10 +297,9 @@ privateCapped
     => String     -- ^ session key
     -> Text       -- ^ leaderboard name
     -> Natural    -- ^ leaderboard ID
-    -> Maybe String     -- ^ leaderboard join code
     -> Natural    -- ^ number to cap
     -> Alert m
-privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 False trigger response
+privateCapped tok lname lbid cap = risingEdgeAlert "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime
@@ -308,20 +308,21 @@ privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 F
       mlb <- either (const Nothing) Just <$>
         runAoC (defaultAoCOpts y tok) (AoCLeaderboard (fromIntegral lbid))
       pure $ mlb >>= \lb -> do
-        let dayMap = M.take (fromIntegral cap) . flip foldMap (lbMembers lb) $ \LBM{..} ->
+        let dayMap = take (fromIntegral cap)
+                   . M.foldMapWithKey (\k xs -> (k,) <$> toList xs)
+                   . MoMa.getMonoidalMap
+                   . flip foldMap (lbMembers lb) $ \LBM{..} ->
               flip foldMap (M.lookup d lbmCompletion) $ \pts ->
                 flip foldMap (M.lookup Part2 pts) $ \tt ->
-                  M.singleton tt (lbmId, lbmName)
-        guard $ M.size dayMap >= fromIntegral cap
+                  MoMa.MonoidalMap (M.singleton tt ((lbmId, lbmName) :| []))
+        guard $ length dayMap >= fromIntegral cap
         pure dayMap
     response y d capMap = do
         globalCap <- (snd =<<) <$> getCapTime y d
         liftIO $ print globalCap
         pure . T.pack $
-          [P.s|Congrats to %s Board (%d%s) Top %d of %04d day %d! %s|]
+          [P.s|Congrats to %s Board Top %d of %04d day %d! %s|]
             (T.unpack lname)
-            lbid
-            (foldMap ("-" <>) joinCode)
             cap
             y
             (dayInt d)
@@ -329,9 +330,9 @@ privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 F
       where
         lbString mcap = T.intercalate ", "
                       . zipWith mkStr [(1::Int)..]
-                      . M.toList $ capMap
+                      $ capMap
           where
-            mkStr place (tt, (i, u)) = T.pack $ [P.s|%s%d%s %s (%s)|] openb place closeb uString tString
+            mkStr place (tt, (i, u)) = T.pack $ [P.s|%s%d%s %s %s|] openb place closeb uString tString
               where
                 uString = maybe ([P.s|Anonymous User #%d|] i) T.unpack u
                 tString = formatTime defaultTimeLocale "%H:%M:%S"
@@ -340,6 +341,7 @@ privateCapped tok lname lbid joinCode cap = risingEdgeAlert "private-capped" 5 F
                 (openb, closeb) = case mcap of
                   Just cc | cc < tt -> ("[", "]")
                   _                 -> ("{", "}")
+
 
 acknowledgeTick :: Applicative m => Alert m
 acknowledgeTick = A

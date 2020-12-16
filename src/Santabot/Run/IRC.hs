@@ -49,7 +49,7 @@ ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.or
         room  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mOrigin
         user  <- T.unpack . T.decodeUtf8 <$> maybe empty pure mNick
         let splitMsg = map T.unwords
-                     . splitAll (splitUntil T.length 300)
+                     . splitAll (splitUntil T.length 200)
                      $ T.words body
         lift . forM_ splitMsg $ \msg -> do
           atomically $

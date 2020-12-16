@@ -41,6 +41,7 @@ library:
   dependencies:
   - bytestring
   - conduino
+  - monoidal-containers
   - conduit
   - unordered-containers
   - deepseq
