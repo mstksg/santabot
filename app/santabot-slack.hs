@@ -10,12 +10,12 @@ import           Main.Master
 import           Network.HTTP.Client.TLS
 import           Numeric.Natural
 import           Santabot.Run.Slack
-import qualified Data.Set                              as S
-import qualified Data.Text                             as T
-import qualified Data.Text.Prettyprint.Doc.Render.Text as PP
-import qualified Dhall                                 as D
-import qualified Dhall.Pretty                          as D
-import qualified Text.Casing                           as Case
+import qualified Data.Set                  as S
+import qualified Data.Text                 as T
+import qualified Dhall                     as D
+import qualified Dhall.Pretty              as D
+import qualified Prettyprinter.Render.Text as PP
+import qualified Text.Casing               as Case
 
 data Conf = Conf
     { cTick        :: Natural              -- ^ in seconds

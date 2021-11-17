@@ -23,12 +23,12 @@ import           Control.Monad.State
 import           Control.Monad.Trans.Free
 import           Data.Bifunctor
 import           Data.Char
-import           Data.Conduino
-import           Data.Conduino.Internal
+import           Data.Conduino hiding (feedPipe)
+import           Data.Conduino.Internal hiding (runStateP)
 import           Data.Foldable
 import           Data.Functor
 import           Data.IORef
-import           Data.List
+import           Data.List (intercalate)
 import           Data.List.NonEmpty                 (NonEmpty(..))
 import           Data.Map                           (Map)
 import           Data.Semigroup

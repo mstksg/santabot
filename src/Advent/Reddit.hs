@@ -117,11 +117,12 @@ dayLink = do
     _ <- optional "https://redd.it"
     "/"
     l <- some (satisfy isAlphaNum)
-    ")"
-    Right l' <- pure $
-      parseURI strictURIParserOptions . T.encodeUtf8 . T.pack $
-        "https://redd.it/" ++ l
-    pure (d, l')
+    void ")"
+    let pUri = parseURI strictURIParserOptions . T.encodeUtf8 . T.pack $
+                "https://redd.it/" ++ l
+    case pUri of
+      Left  x -> fail $ show x
+      Right y -> pure (d, y)
 
 parseLinks :: Parser (Map Integer (Map Day URI))
 parseLinks = M.fromList <$> many (try parseYear)

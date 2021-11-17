@@ -359,7 +359,7 @@ validYears = do
 displayLink :: Integer -> Advent.Day -> String
 displayLink yr day = u
   where
-    rp :<|> _ = allLinks adventAPI yr
+    _ :<|> rp :<|> _ = allLinks adventAPI yr
     rd :<|> _ = rp day
     u = showBaseUrl $ aocBase { baseUrlPath = show (linkURI rd) }
 

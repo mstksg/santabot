@@ -65,7 +65,7 @@ instance FromForm SlashData where
 type SlackApi =
        "santabot"
     :> ReqBody '[FormUrlEncoded] SlashData
-    :> PostNoContent '[PlainText] NoContent
+    :> PostNoContent
   :<|> "events"
     :> ReqBody '[JSON] Slack.EventRequest
     :> Post '[JSON] A.Value

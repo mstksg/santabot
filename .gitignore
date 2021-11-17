@@ -1,5 +1,4 @@
 .stack-work/
-santabot.cabal
 santabot-conf.yaml
 /*.dhall
 data/wikitest.md
@@ -10,3 +9,4 @@ cache
 tags
 .history
 *.json
+/dist-newstyle
