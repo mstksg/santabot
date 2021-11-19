@@ -21,8 +21,10 @@ data Conf = Conf
     { cTick        :: Natural          -- ^ in seconds
     , cNick        :: String           -- ^ bot username
     , cPassword    :: Maybe String
+    , cSasl        :: Bool
     , cChannels    :: [String]
     , cBotConf     :: BotConf
+    , cServer      :: String
     }
   deriving Generic
 
@@ -42,5 +44,5 @@ main = do
     phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
     mgr <- newTlsManager
     intcodeMap <- newIORef mempty
-    launchIRC cChannels cNick cPassword (fromIntegral cTick * 1000000)
+    launchIRC cServer cChannels cNick cPassword cSasl (fromIntegral cTick * 1000000)
         (masterBot cBotConf mgr intcodeMap phrasebook)

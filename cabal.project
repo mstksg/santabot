@@ -1,2 +1,7 @@
 packages: *.cabal
 allow-newer: newtype:base, monoidal-containers:lens, monoidal-containers:semialign
+
+source-repository-package
+  type: git
+  location: https://github.com/mstksg/simpleirc
+  tag: 0310ad554791cb0545ff24db8438ffc62ebe8ba4

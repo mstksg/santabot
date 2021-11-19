@@ -21,8 +21,9 @@ import           Control.Monad.Trans.Maybe
 import           Data.Bifunctor
 import           Data.Conduit hiding             (connect)
 import           Data.Conduit.TQueue
-import           Data.List
+import           Data.List                       (mapAccumL)
 import           Network.SimpleIRC               as IRC
+import           Network.SimpleIRC.Sasl          as IRC
 import           Santabot.Bot
 import qualified Data.ByteString                 as BS
 import qualified Data.Conduit.Combinators        as C
@@ -33,13 +34,14 @@ import qualified Language.Haskell.Printf         as P
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
 ircConf
-    :: [String]
+    :: String
+    -> [String]
     -> String
     -> Maybe String
     -> MVar ()
     -> TBMQueue Event
     -> IrcConfig
-ircConf channels nick pwd started eventQueue = (mkDefaultConfig "irc.freenode.org" nick)
+ircConf serv channels nick pwd started eventQueue = (mkDefaultConfig serv nick)
       { cChannels = channels
       , cPass     = pwd
       , cEvents   = [Privmsg onMessage, Disconnect onDisc, Notice begin]
@@ -85,16 +87,24 @@ splitUntil f i = bimap (map snd) (map snd)
 
 -- | Begin the IRC process with stdout logging.
 launchIRC
-    :: [String]         -- ^ channels to join
+    :: String           -- ^ server
+    -> [String]         -- ^ channels to join
     -> String           -- ^ nick
     -> Maybe String     -- ^ password
+    -> Bool             -- ^ use sasl plain
     -> Int              -- ^ tick delay (microseconds)
     -> Bot IO ()
     -> IO ()
-launchIRC channels nick pwd tick bot = do
+launchIRC serv channels nick pwd useSasl tick bot = do
     eventQueue <- atomically $ newTBMQueue 1000000
     started    <- newEmptyMVar
-    let cfg = ircConf channels nick pwd started eventQueue
+    let cfg = (ircConf serv channels nick pwd started eventQueue)
+                { cSasl = do
+                    guard useSasl
+                    p <- pwd
+                    pure . SaslPlain $ SaslPlainArgs Nothing nick p
+                , cUsername = nick
+                }
 
     Right irc <- connect cfg True True
 
