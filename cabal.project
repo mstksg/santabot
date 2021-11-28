@@ -4,4 +4,4 @@ allow-newer: newtype:base, monoidal-containers:lens, monoidal-containers:semiali
 source-repository-package
   type: git
   location: https://github.com/mstksg/simpleirc
-  tag: 0310ad554791cb0545ff24db8438ffc62ebe8ba4
+  tag: aa82d629fe4502fb10ef4d9a9f465961337e81cc

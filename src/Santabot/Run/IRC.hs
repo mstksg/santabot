@@ -102,7 +102,7 @@ launchIRC serv channels nick pwd useSasl tick bot = do
                 { cSasl = do
                     guard useSasl
                     p <- pwd
-                    pure . SaslPlain $ SaslPlainArgs Nothing nick p
+                    pure . saslPlain $ SaslPlainArgs Nothing nick p
                 , cUsername = nick
                 }
 
