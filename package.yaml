@@ -26,7 +26,7 @@ ghc-options:
 - -Werror=incomplete-patterns
 
 dependencies:
-- advent-of-code-api >= 0.2.7
+- advent-of-code-api >= 0.2.8.2
 - aeson
 - base >= 4.7 && < 5
 - casing
