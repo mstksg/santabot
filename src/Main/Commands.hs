@@ -1,15 +1,16 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ParallelListComp #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE ViewPatterns #-}
 
 module Main.Commands (
@@ -280,7 +281,7 @@ eventCountdown lim =
       where
         d = localDay $ I.sup i
         (y, m, _) = toGregorian d
-        daysLeft = (fromGregorian y 12 1 `diffDays` d)
+        daysLeft = fromGregorian y 12 1 `diffDays` d
 
     displayCE :: Integer -> Integer -> String
     displayCE d = [P.s|%d day%s left until Advent of Code %d!|] d suff

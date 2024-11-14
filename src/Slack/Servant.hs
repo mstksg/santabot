@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -30,7 +29,6 @@ import qualified Data.Text as T
 import Data.Time
 import Deriving.Aeson
 import Servant.API
-import Servant.API.Generic
 import Servant.Client.Core.RunClient
 import Servant.Client.Generic
 import qualified Text.Casing as Case

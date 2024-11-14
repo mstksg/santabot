@@ -1,6 +1,5 @@
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
 module Advent.Reddit (
@@ -18,6 +17,7 @@ import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString.Lazy as BSL
 import Data.Char
+import Data.Either
 import Data.Foldable
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -85,14 +85,17 @@ getPostLinks =
     . httpLbs wikiList
 
 wikiList :: Request
-Just wikiList =
-  parseRequest
-    "https://www.reddit.com/r/adventofcode/wiki/solution_megathreads?show_source"
+wikiList =
+  fromMaybe err $
+    parseRequest
+      "https://www.reddit.com/r/adventofcode/wiki/solution_megathreads?show_source"
+  where
+    err = error "Solutions megathread request not parsed"
 
 parsePostLinks :: Text -> Map Integer (Map Day URI)
 parsePostLinks =
   M.unionsWith (<>)
-    . map (either (const M.empty) id . parse parseLinks "solution_megathreads")
+    . map (fromRight M.empty . parse parseLinks "solution_megathreads")
     . mapMaybe findTheDiv
     . T.universeTree
     . T.parseTree

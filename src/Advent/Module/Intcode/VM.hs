@@ -1,16 +1,11 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE ViewPatterns #-}
 
 module Advent.Module.Intcode.VM (
   Memory (..),
@@ -105,7 +100,7 @@ withInput ::
   Int ->
   (t Int -> m r) ->
   m (r, Mode)
-withInput mo f = withInputLazy mo ((f =<<) . sequenceA)
+withInput mo f = withInputLazy mo (f <=< sequenceA)
 
 intMode :: Int -> Maybe Mode
 intMode = \case
@@ -170,7 +165,7 @@ step = do
       c <-
         toNatural' =<< case lastMode of
           Pos -> peekMem =<< gets mPos
-          Imm -> fromIntegral <$> gets mPos
+          Imm -> gets (fromIntegral . mPos)
           Rel -> (+) <$> (peekMem =<< gets mPos) <*> gets mBase
       _ <- readMem
       True <$ modify (\m -> m{mRegs = M.insert c y (mRegs m)})

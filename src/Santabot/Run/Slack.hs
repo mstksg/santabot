@@ -1,6 +1,5 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -23,6 +22,7 @@ import Data.Conduit hiding (connect)
 import qualified Data.Conduit.Combinators as C
 import Data.Conduit.TQueue
 import qualified Data.Map as M
+import Data.Maybe
 import Data.Proxy
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -226,5 +226,5 @@ responseHandler mgr TokenSet{..} topic R{..} = case rType of
     print =<< runClientM (ssaPostMessage postMessage) clientEnv
   where
     Slack.SlackServerApi{..} = Slack.slackServerClient
-    Just baseUrl = parseBaseUrl "https://slack.com"
+    baseUrl = fromMaybe (error "bad base url parse") $ parseBaseUrl "https://slack.com"
     clientEnv = mkClientEnv mgr baseUrl

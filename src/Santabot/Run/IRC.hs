@@ -75,7 +75,7 @@ splitAll f = go
   where
     go xs = case f xs of
       (ys, zs)
-        | null ys || null zs -> ys : []
+        | null ys || null zs -> [ys]
         | otherwise -> ys : go zs
 
 splitUntil ::
@@ -111,7 +111,7 @@ launchIRC ::
   Bot IO () ->
   IO ()
 launchIRC serv channels nick pwd useSasl tick bot = do
-  eventQueue <- atomically $ newTBMQueue 1000000
+  eventQueue <- atomically $ newTBMQueue 1_000_000
   started <- newEmptyMVar
   let cfg =
         (ircConf serv channels nick pwd started eventQueue)
@@ -126,7 +126,7 @@ launchIRC serv channels nick pwd useSasl tick bot = do
 
   _ <- forkIO $ do
     () <- takeMVar started
-    threadDelay 5000000
+    threadDelay 5_000_000
     forever $ do
       threadDelay tick
       t <- aocServerTime
