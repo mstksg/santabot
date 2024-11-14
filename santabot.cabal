@@ -1,4 +1,4 @@
-cabal-version: 1.12
+cabal-version:      1.12
 
 -- This file has been generated from package.yaml by hpack version 0.34.2.
 --
@@ -6,48 +6,49 @@ cabal-version: 1.12
 --
 -- hash: 53e229ef9e480ec2c32c0476805ba07d7b74c283256a532237c5c5ce311a2b27
 
-name:           santabot
-version:        0.1.0.0
-synopsis:       Advent of Code utility IRC bot
-description:    See me online at freenode ##advent-of-code!
-category:       Web
-homepage:       https://github.com/mstksg/santabot#readme
-bug-reports:    https://github.com/mstksg/santabot/issues
-author:         Justin Le
-maintainer:     justin@jle.im
-copyright:      (c) Justin Le 2019
-license:        BSD3
-license-file:   LICENSE
-build-type:     Simple
+name:               santabot
+version:            0.1.0.0
+synopsis:           Advent of Code utility IRC bot
+description:        See me online at freenode ##advent-of-code!
+category:           Web
+homepage:           https://github.com/mstksg/santabot#readme
+bug-reports:        https://github.com/mstksg/santabot/issues
+author:             Justin Le
+maintainer:         justin@jle.im
+copyright:          (c) Justin Le 2019
+license:            BSD3
+license-file:       LICENSE
+build-type:         Simple
 extra-source-files:
-    README.md
-    CHANGELOG.md
+  CHANGELOG.md
+  README.md
 
 source-repository head
-  type: git
+  type:     git
   location: https://github.com/mstksg/santabot
 
 library
   exposed-modules:
-      Advent.Cache
-      Advent.Module.Intcode
-      Advent.Module.Intcode.VM
-      Advent.Reddit
-      Main.Commands
-      Main.Master
-      Santabot.Bot
-      Santabot.Run.IRC
-      Santabot.Run.Slack
-      Slack.Servant
-  other-modules:
-      Paths_santabot
-  hs-source-dirs:
-      src
-  ghc-options: -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns
+    Advent.Cache
+    Advent.Module.Intcode
+    Advent.Module.Intcode.VM
+    Advent.Reddit
+    Main.Commands
+    Main.Master
+    Santabot.Bot
+    Santabot.Run.IRC
+    Santabot.Run.Slack
+    Slack.Servant
+
+  other-modules:    Paths_santabot
+  hs-source-dirs:   src
+  ghc-options:
+    -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns
+
   build-depends:
-      advent-of-code-api >=0.2.9.1
+      advent-of-code-api       >=0.2.9.1
     , aeson
-    , base >=4.7 && <5
+    , base                     >=4.7     && <5
     , bytestring
     , casing
     , conduino
@@ -96,19 +97,21 @@ library
     , uri-bytestring
     , warp
     , yaml
+
   default-language: Haskell2010
 
 executable santabot-irc
-  main-is: santabot-irc.hs
-  other-modules:
-      Paths_santabot
-  hs-source-dirs:
-      app
-  ghc-options: -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns -threaded -rtsopts -with-rtsopts=-N
+  main-is:          santabot-irc.hs
+  other-modules:    Paths_santabot
+  hs-source-dirs:   app
+  ghc-options:
+    -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns
+    -threaded -rtsopts -with-rtsopts=-N
+
   build-depends:
-      advent-of-code-api >=0.2.7
+      advent-of-code-api  >=0.2.7
     , aeson
-    , base >=4.7 && <5
+    , base                >=4.7   && <5
     , casing
     , conduit
     , containers
@@ -122,19 +125,21 @@ executable santabot-irc
     , th-printf
     , time
     , yaml
+
   default-language: Haskell2010
 
 executable santabot-slack
-  main-is: santabot-slack.hs
-  other-modules:
-      Paths_santabot
-  hs-source-dirs:
-      app
-  ghc-options: -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns -threaded -rtsopts -with-rtsopts=-N
+  main-is:          santabot-slack.hs
+  other-modules:    Paths_santabot
+  hs-source-dirs:   app
+  ghc-options:
+    -Wall -Wcompat -Wredundant-constraints -Werror=incomplete-patterns
+    -threaded -rtsopts -with-rtsopts=-N
+
   build-depends:
-      advent-of-code-api >=0.2.7
+      advent-of-code-api  >=0.2.7
     , aeson
-    , base >=4.7 && <5
+    , base                >=4.7   && <5
     , casing
     , conduit
     , containers
@@ -148,4 +153,5 @@ executable santabot-slack
     , th-printf
     , time
     , yaml
+
   default-language: Haskell2010
