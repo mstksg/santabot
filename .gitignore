@@ -10,3 +10,5 @@ tags
 .history
 *.json
 /dist-newstyle
+/.direnv
+/result

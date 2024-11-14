@@ -147,7 +147,7 @@ askLink M{..} = do
 dayTitle :: Integer -> Advent.Day -> IO (Maybe Text)
 dayTitle y d = runMaybeT $ do
     ps <- MaybeT $ either (const Nothing) Just <$>
-      runAoC (defaultAoCOpts y "") (AoCPrompt d)
+      runAoC (aocOpts y "") (AoCPrompt d)
     p1 <- maybe empty pure $ M.lookup Part1 ps
     either (const empty) pure $
       parse parseTitle "" p1
@@ -268,7 +268,7 @@ getCapTime y d = liftIO $ do
     putStrLn $ [P.s|[CAP DETECTION] Getting global leaderboard cap time for %04d %d at %s|]
                   y (dayInt d) (show t)
     mlb <- either (const Nothing) Just <$>
-      runAoC (defaultAoCOpts y "") (AoCDailyLeaderboard d)
+      runAoC (aocOpts y "") (AoCDailyLeaderboard d)
     pure $ mlb >>= \DLB{..} -> do
       guard $ M.size dlbStar1 >= 100
       ctime1 <- completeTime <$> NE.nonEmpty (toList dlbStar1)
@@ -306,7 +306,7 @@ privateCapped tok lname lbid cap = risingEdgeAlert "private-capped" 5 False trig
       putStrLn $ [P.s|[PRIVATE CAP DETECTION] Getting private leaderboard cap time for %04d %d at %s|]
                     y (dayInt d) (show t)
       mlb <- either (const Nothing) Just <$>
-        runAoC (defaultAoCOpts y tok) (AoCLeaderboard (fromIntegral lbid))
+        runAoC (aocOpts y tok) (AoCLeaderboard (fromIntegral lbid))
       pure $ mlb >>= \lb -> do
         let dayMap = take (fromIntegral cap)
                    . M.foldMapWithKey (\k xs -> (k,) <$> toList xs)
@@ -371,3 +371,11 @@ addSantaPhrase txt = do
           <$> randomRIO (0, S.size phrasebook - 1)
       pure $ pick <> " " <> txt
 
+aocOpts :: Integer -> String -> AoCOpts
+aocOpts = defaultAoCOpts userAgent
+
+userAgent :: AoCUserAgent
+userAgent = AoCUserAgent
+  { _auaRepo = "https://github.com/mstksg/santabot"
+  , _auaEmail = "justin@jle.im"
+  }

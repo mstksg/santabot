@@ -18,6 +18,7 @@ module Advent.Module.Intcode (
 import           Advent.Module.Intcode.VM
 import           Conduit
 import           Control.Applicative hiding         (many, some)
+import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Control.Monad.Trans.Free

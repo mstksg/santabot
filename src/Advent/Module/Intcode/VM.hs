@@ -22,6 +22,7 @@ module Advent.Module.Intcode.VM (
   , runProg
   ) where
 
+import           Control.Monad
 import           Control.Monad.Except
 import           Control.Monad.State
 import           Data.Conduino
