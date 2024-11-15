@@ -49,7 +49,6 @@ main = do
   c@Conf{..} <- D.inputFile D.auto "santabot-conf-slack.dhall"
   PP.putDoc $ D.prettyExpr (D.embed D.inject c)
   putStrLn ""
-  phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
   mgr <- newTlsManager
   intcodeMap <- newIORef mempty
   launchSlack
@@ -60,4 +59,4 @@ main = do
     cAppUser
     cTopicSuffix
     cChannels
-    (masterBot cBotConf mgr intcodeMap phrasebook)
+    (masterBot cBotConf mgr intcodeMap)

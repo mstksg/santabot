@@ -5,7 +5,6 @@
 
 import Control.Applicative
 import Data.IORef
-import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Dhall as D
 import qualified Dhall.Pretty as D
@@ -61,7 +60,6 @@ main = do
   c@Conf{..} <- D.inputFile D.auto o
   PP.putDoc $ D.prettyExpr (D.embed D.inject c)
   putStrLn ""
-  phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"
   mgr <- newTlsManager
   intcodeMap <- newIORef mempty
   launchIRC
@@ -71,4 +69,4 @@ main = do
     cPassword
     cSasl
     (fromIntegral cTick * 1000000)
-    (masterBot cBotConf mgr intcodeMap phrasebook)
+    (masterBot cBotConf mgr intcodeMap)

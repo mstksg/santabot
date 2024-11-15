@@ -8,4 +8,5 @@
 , countdown : Optional Natural
 , commandBots : List ./CommandBot.dhall
 , alertBots : List ./AlertBot.dhall
+, phrasebook : List Text
 }

@@ -39,6 +39,7 @@ data BotConf = BotConf
   -- ^ channel to send alerts to
   , bcCommandBots :: [CommandBot]
   , bcAlertBots :: [AlertBot]
+  , bcPhrasebook :: S.Set T.Text
   }
   deriving (Generic)
 
@@ -199,8 +200,8 @@ alertBotBot name = \case
       (liLeaderboard pciLeaderboardInfo)
       pciCap
 
-masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> S.Set T.Text -> Bot IO ()
-masterBot BotConf{..} mgr intcodeMap phrasebook =
-  runReaderC phrasebook . mergeBots $
+masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> Bot IO ()
+masterBot BotConf{..} mgr intcodeMap =
+  runReaderC bcPhrasebook . mergeBots $
     commandBots (commandBotBot bcName mgr intcodeMap <$> bcCommandBots)
       : map (alertBot bcAlerts . alertBotBot bcName) bcAlertBots
