@@ -46,18 +46,22 @@ instance D.ToDhall Conf where
 
 main :: IO ()
 main = do
-  o <-
+  (confPath, cacheDir) <-
     O.execParser $
       O.info
-        ( O.strOption
-            (O.long "conf" <> O.metavar "PATH" <> O.value "santabot-irc-conf.dhall" <> O.showDefault)
+        ( ( (,)
+              <$> O.strOption
+                (O.long "conf" <> O.metavar "PATH" <> O.value "santabot-irc-conf.dhall" <> O.showDefault)
+              <*> O.strOption
+                (O.long "cache" <> O.metavar "PATH" <> O.value "cache" <> O.showDefault)
+          )
             <**> O.helper
         )
         ( O.fullDesc
             <> O.progDesc "santabot irc client"
             <> O.header "santabot-irc -- santabot irc client"
         )
-  c@Conf{..} <- D.inputFile D.auto o
+  c@Conf{..} <- D.inputFile D.auto confPath
   PP.putDoc $ D.prettyExpr (D.embed D.inject c)
   putStrLn ""
   mgr <- newTlsManager
@@ -69,4 +73,4 @@ main = do
     cPassword
     cSasl
     (fromIntegral cTick * 1000000)
-    (masterBot cBotConf mgr intcodeMap)
+    (masterBot cBotConf mgr intcodeMap cacheDir)

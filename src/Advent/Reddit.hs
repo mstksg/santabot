@@ -13,6 +13,7 @@ import Advent
 import Advent.Cache
 import Control.Monad
 import Control.Monad.Combinators
+import System.FilePath
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString.Lazy as BSL
@@ -43,22 +44,22 @@ checkUncapped u = fmap isJust . runMaybeT $ do
   Right t <- T.decodeUtf8' . BSL.toStrict . responseBody <$> liftIO (httpLbs req mgr)
   guard $ "capped" `T.isInfixOf` T.map toLower t
 
-getPostLink :: Integer -> Day -> IO (Maybe String)
-getPostLink y d = runMaybeT $ do
+getPostLink :: FilePath -> Integer -> Day -> IO (Maybe String)
+getPostLink cacheDir y d = runMaybeT $ do
   guard =<< liftIO (challengeReleased y d)
-  mp <- liftIO cachedPostLinks
+  mp <- liftIO (cachedPostLinks cacheDir)
   case M.lookup d =<< M.lookup y mp of
     Nothing -> do
       mp' <- liftIO $ do
-        removeFile cachePath
-        cachedPostLinks
+        removeFile (cacheDir </> cacheFile)
+        cachedPostLinks cacheDir
       maybe empty pure $
         M.lookup d =<< M.lookup y mp'
     Just u -> pure u
 
-cachedPostLinks :: IO (Map Integer (Map Day String))
-cachedPostLinks =
-  cacheing cachePath sl $
+cachedPostLinks :: FilePath -> IO (Map Integer (Map Day String))
+cachedPostLinks cacheDir =
+  cacheing (cacheDir </> cacheFile) sl $
     getPostLinks =<< newTlsManager
   where
     sl =
@@ -70,8 +71,8 @@ cachedPostLinks =
               . T.encodeUtf8
         }
 
-cachePath :: FilePath
-cachePath = "cache/postlinks.yaml"
+cacheFile :: FilePath
+cacheFile = "postlinks.yaml"
 
 getPostLinks :: Manager -> IO (Map Integer (Map Day String))
 getPostLinks =

@@ -147,14 +147,15 @@ instance D.ToDhall AlertBot where
 
 commandBotBot ::
   (MonadUnliftIO m, MonadFail m, MonadReader Phrasebook m) =>
+    FilePath ->
   T.Text ->
   Manager ->
   IORef (Map Nick Paused) ->
   CommandBot ->
   Command m
-commandBotBot name mgr intcodeMap = \case
+commandBotBot cacheDir name mgr intcodeMap = \case
   CBPuzzleLink -> puzzleLink
-  CBPuzzleThread -> puzzleThread
+  CBPuzzleThread -> puzzleThread cacheDir
   CBCapTimeBot -> capTimeBot
   CBNextPuzzle -> nextPuzzle
   CBIntcode -> intcodeBot mgr intcodeMap
@@ -186,22 +187,23 @@ commandBotBot name mgr intcodeMap = \case
 
 alertBotBot ::
   (MonadUnliftIO m, MonadReader Phrasebook m) =>
+    FilePath ->
   T.Text ->
   AlertBot ->
   Alert m
-alertBotBot name = \case
+alertBotBot cacheDir name = \case
   ABChallengeCountdown evts -> challengeCountdown evts
   ABEventCountdown lim -> eventCountdown lim
-  ABBoardCapped -> boardCapped
+  ABBoardCapped -> boardCapped cacheDir
   ABPrivateCapped PrivateCappedInfo{..} ->
-    privateCapped
+    privateCapped cacheDir
       pciSession
       name
       (liLeaderboard pciLeaderboardInfo)
       pciCap
 
-masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> Bot IO ()
-masterBot BotConf{..} mgr intcodeMap =
+masterBot :: BotConf -> Manager -> IORef (Map Nick Paused) -> FilePath -> Bot IO ()
+masterBot BotConf{..} mgr intcodeMap cacheDir =
   runReaderC bcPhrasebook . mergeBots $
-    commandBots (commandBotBot bcName mgr intcodeMap <$> bcCommandBots)
-      : map (alertBot bcAlerts . alertBotBot bcName) bcAlertBots
+    commandBots (commandBotBot cacheDir bcName mgr intcodeMap <$> bcCommandBots)
+      : map (alertBot bcAlerts . alertBotBot cacheDir bcName) bcAlertBots

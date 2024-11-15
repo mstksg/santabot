@@ -85,8 +85,8 @@ puzzleLink =
     , cResp = \(y, d) -> liftIO $ fancyLink y d (displayLink y d)
     }
 
-puzzleThread :: MonadIO m => Command m
-puzzleThread =
+puzzleThread :: MonadIO m => FilePath -> Command m
+puzzleThread cacheDir =
   C
     { cName = "thread"
     , cHelp =
@@ -94,7 +94,7 @@ puzzleThread =
     , cParse = askLink
     , cResp = \(y, d) ->
         liftIO $
-          getPostLink y d >>= \case
+          getPostLink cacheDir y d >>= \case
             Nothing -> pure "Thread not available, sorry!"
             Just u -> fancyLink y d u
     }
@@ -315,9 +315,10 @@ getCapTime y d = liftIO $ do
       maximum
         . fmap (zonedTimeToUTC . dlbmCompleteTime y d . dlbmDecTime)
 
-boardCapped :: MonadIO m => Alert m
-boardCapped =
+boardCapped :: MonadIO m => FilePath -> Alert m
+boardCapped cacheDir =
   risingEdgeAlert
+    cacheDir
     "capped"
     1
     True
@@ -325,7 +326,7 @@ boardCapped =
     response
   where
     response y d capTime = liftIO $ do
-      linkUrl <- fromMaybe "thread not yet available" <$> getPostLink y d
+      linkUrl <- fromMaybe "thread not yet available" <$> getPostLink cacheDir y d
       pure . T.pack $
         [P.s|Global Leaderboard for Day %d is now capped at %s (%s)!|]
           (dayInt d)
@@ -334,6 +335,8 @@ boardCapped =
 
 privateCapped ::
   MonadIO m =>
+  -- | Cache dir
+  FilePath ->
   -- | session key
   String ->
   -- | leaderboard name
@@ -343,7 +346,7 @@ privateCapped ::
   -- | number to cap
   Natural ->
   Alert m
-privateCapped tok lname lbid cap = risingEdgeAlert "private-capped" 5 False trigger response
+privateCapped cacheDir tok lname lbid cap = risingEdgeAlert cacheDir "private-capped" 5 False trigger response
   where
     trigger y d = liftIO $ do
       t <- aocServerTime

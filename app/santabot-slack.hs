@@ -59,4 +59,4 @@ main = do
     cAppUser
     cTopicSuffix
     cChannels
-    (masterBot cBotConf mgr intcodeMap)
+    (masterBot cBotConf mgr intcodeMap "cache")

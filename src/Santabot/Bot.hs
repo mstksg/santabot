@@ -214,6 +214,8 @@ data CapState
 risingEdgeAlert ::
   forall m a.
   MonadIO m =>
+  -- | cache dir
+  FilePath ->
   -- | cap log dir
   String ->
   -- | number of minutes between polls
@@ -225,13 +227,13 @@ risingEdgeAlert ::
   -- | how to respond to /first/ 'Just'
   (Integer -> Advent.Day -> a -> m Text) ->
   Alert m
-risingEdgeAlert capLog delay noticeMe trigger response =
+risingEdgeAlert cacheDir capLog delay noticeMe trigger response =
   A
     { aTrigger = risingEdge
     , aResp = fmap (noticeMe,) . uncurry sendEdge
     }
   where
-    logDir = "cache" </> capLog
+    logDir = cacheDir </> capLog
     risingEdge i@(I.sup -> isup) = runMaybeT $ do
       liftIO $ createDirectoryIfMissing True logDir
       guard $ mm == 12
