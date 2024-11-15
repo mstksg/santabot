@@ -3,6 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
+import Control.Applicative
 import Data.IORef
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -12,6 +13,7 @@ import GHC.Generics
 import Main.Master
 import Network.HTTP.Client.TLS
 import Numeric.Natural
+import qualified Options.Applicative as O
 import qualified Prettyprinter.Render.Text as PP
 import Santabot.Run.IRC
 import qualified Text.Casing as Case
@@ -45,7 +47,18 @@ instance D.ToDhall Conf where
 
 main :: IO ()
 main = do
-  c@Conf{..} <- D.inputFile D.auto "santabot-conf-irc.dhall"
+  o <-
+    O.execParser $
+      O.info
+        ( O.strOption
+            (O.long "conf" <> O.metavar "PATH" <> O.value "santabot-irc-conf.dhall" <> O.showDefault)
+            <**> O.helper
+        )
+        ( O.fullDesc
+            <> O.progDesc "santabot irc client"
+            <> O.header "santabot-irc -- santabot irc client"
+        )
+  c@Conf{..} <- D.inputFile D.auto o
   PP.putDoc $ D.prettyExpr (D.embed D.inject c)
   putStrLn ""
   phrasebook <- S.fromList . map T.pack . lines <$> readFile "phrasebook.txt"

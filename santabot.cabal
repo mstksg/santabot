@@ -119,6 +119,7 @@ executable santabot-irc
     , http-client-tls
     , http-conduit
     , mtl
+    , optparse-applicative
     , prettyprinter
     , santabot
     , text

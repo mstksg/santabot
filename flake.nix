@@ -26,11 +26,20 @@
         };
     in
     {
-      packages = project-flake.packages;
+      packages = project-flake.packages
+        //
+        {
+          dhall = pkgs.dhallPackages.buildDhallDirectoryPackage {
+            name = "santabot-dhall";
+            src = ./dhall;
+            source = true;
+          };
+        }
+      ;
       apps = project-flake.apps;
       checks = project-flake.checks;
       devShells = project-flake.devShells;
-      legacyPackages."${name}" = project-flake;
+      legacyPackages = pkgs;
     }
     );
 }
