@@ -12,6 +12,7 @@ module Santabot.Run.IRC (
 ) where
 
 import Advent
+import Control.Exception
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -122,7 +123,7 @@ launchIRC serv channels nick pwd useSasl tick bot = do
           , cUsername = nick
           }
 
-  Right irc <- connect cfg True True
+  irc <- either throwIO pure =<< connect cfg True True
 
   _ <- forkIO $ do
     () <- takeMVar started
