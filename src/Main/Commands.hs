@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE ExistentialQuantification #-}
@@ -283,7 +284,7 @@ eventCountdown lim =
         nextEventSecs = LocalTime nextEvent midnight
         secs :: [Natural]
         secs =
-          [ceiling (nextEventSecs `diffLocalTime` I.inf i) .. floor (nextEventSecs `diffLocalTime` I.sup i)]
+          [ceiling (nextEventSecs `diffLocalTime` I.sup i) .. floor (nextEventSecs `diffLocalTime` I.inf i)]
 
     displayCE :: (Text, Integer) -> String
     displayCE (s, y) = [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
