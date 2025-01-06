@@ -283,7 +283,7 @@ eventCountdown lim =
         nextEventSecs = LocalTime nextEvent midnight
         secs :: [Natural]
         secs =
-          [ceiling (I.inf i `diffLocalTime` nextEventSecs) .. floor (I.inf i `diffLocalTime` nextEventSecs)]
+          [ceiling (nextEventSecs `diffLocalTime` I.inf i) .. floor (nextEventSecs `diffLocalTime` I.sup i)]
 
     displayCE :: (Text, Integer) -> String
     displayCE (s, y) = [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
