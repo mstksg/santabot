@@ -1,3 +1,4 @@
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -32,6 +33,7 @@ import qualified Language.Haskell.Printf as P
 import Network.SimpleIRC as IRC
 import Network.SimpleIRC.Sasl as IRC
 import Santabot.Bot
+import System.IO
 
 -- | IRC configuration for simpleirc.  Specifies server, name,
 -- channels, and the Privmsg handler.
@@ -128,8 +130,9 @@ launchIRC serv channels nick pwd useSasl tick bot = do
   _ <- forkIO $ do
     () <- takeMVar started
     threadDelay 5_000_000
-    forever $ do
+    forever do
       threadDelay tick
+      hFlush stdout
       t <- aocServerTime
       atomically $ writeTBMQueue eventQueue (ETick t)
 
