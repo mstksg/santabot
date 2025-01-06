@@ -13,7 +13,6 @@ import Advent
 import Advent.Cache
 import Control.Monad
 import Control.Monad.Combinators
-import System.FilePath
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Maybe
 import qualified Data.ByteString.Lazy as BSL
@@ -31,6 +30,7 @@ import qualified Data.Yaml as Y
 import Network.HTTP.Client
 import Network.HTTP.Client.TLS
 import System.Directory
+import System.FilePath
 import Text.HTML.TagSoup.Tree (TagTree (..))
 import qualified Text.HTML.TagSoup.Tree as T
 import Text.Megaparsec

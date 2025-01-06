@@ -12,11 +12,11 @@ module Santabot.Run.IRC (
 ) where
 
 import Advent
-import Control.Exception
 import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.STM.TBMQueue
+import Control.Exception
 import Control.Monad
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Maybe

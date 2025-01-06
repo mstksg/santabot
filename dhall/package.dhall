@@ -6,15 +6,111 @@ let ChallengeEvent = types.ChallengeEvent
 
 let AlertBot = types.AlertBot
 
+let Quotient = ./util/quotient.dhall
+
 let LeaderboardInfo = types.LeaderboardInfo
 
+let lessThanEqual =
+      λ(x : Natural) → λ(y : Natural) → Natural/isZero (Natural/subtract y x)
+
+let lessThan = λ(x : Natural) → λ(y : Natural) → lessThanEqual y x == False
+
+let equal
+    : Natural → Natural → Bool
+    = λ(a : Natural) → λ(b : Natural) → lessThanEqual a b && lessThanEqual b a
+
+let powerOfTwo =
+      let PotHelp =
+            < Search : { pow : Natural, val : Natural }
+            | Found : Natural
+            | Fail
+            >
+
+      in  λ(n : Natural) →
+            merge
+              { Search = λ(pv : { pow : Natural, val : Natural }) → None Natural
+              , Found = λ(v : Natural) → Some v
+              , Fail = None Natural
+              }
+              ( Natural/fold
+                  25
+                  PotHelp
+                  ( λ(acc : PotHelp) →
+                      merge
+                        { Search =
+                            λ(pv : { pow : Natural, val : Natural }) →
+                              if    lessThan n pv.val
+                              then  PotHelp.Fail
+                              else  if equal n pv.val
+                              then  PotHelp.Found pv.pow
+                              else  PotHelp.Search
+                                      { pow = pv.pow + 1, val = pv.val * 2 }
+                        , Found = λ(v : Natural) → PotHelp.Found v
+                        , Fail = PotHelp.Fail
+                        }
+                        acc
+                  )
+                  (PotHelp.Search { pow = 0, val = 1 })
+              )
+
+let exactDays =
+      λ(sec : Natural) →
+        let qr = Quotient.quotient sec 86400
+
+        in  if Natural/isZero qr.r then Some qr.q else None Natural
+
 in  { types
+    , util = { exactDays, powerOfTwo }
     , allChallengeEvents =
       [ ChallengeEvent.Hour
       , ChallengeEvent.TenMin
       , ChallengeEvent.Minute
       , ChallengeEvent.Start
       ]
+    , countdownConditions =
+      { numDays =
+          λ(lim : Natural) →
+          λ(n : Natural) →
+            merge
+              { Some =
+                  λ(d : Natural) →
+                    if    lessThanEqual d lim
+                    then  Some (Natural/show d ++ " days")
+                    else  None Text
+              , None = None Text
+              }
+              (exactDays n)
+      , pow2Days =
+          λ(lim : Natural) →
+          λ(n : Natural) →
+            merge
+              { Some =
+                  λ(d : Natural) →
+                    if    lessThanEqual d lim
+                    then  merge
+                            { Some =
+                                λ(p : Natural) →
+                                  Some ("2^" ++ Natural/show p ++ " days")
+                            , None = None Text
+                            }
+                            (powerOfTwo d)
+                    else  None Text
+              , None = None Text
+              }
+              (exactDays n)
+      , pow2Secs =
+          λ(limSecs : Natural) →
+          λ(n : Natural) →
+            if    lessThanEqual n limSecs
+            then  merge
+                    { Some =
+                        λ(p : Natural) →
+                          Some ("2^" ++ Natural/show p ++ " seconds")
+                    , None = None Text
+                    }
+                    (powerOfTwo n)
+            else  None Text
+      }
     , defaultCommandBots =
         λ(about : Text) →
         λ(lbi : Optional LeaderboardInfo) →
@@ -33,7 +129,7 @@ in  { types
               lbi
     , defaultAlertBots =
         λ(ce : List ChallengeEvent) →
-        λ(limit : Optional Natural) →
+        λ(limit : Natural → Optional Text) →
         λ ( mpc
           : Optional
               { session : Text

@@ -21,9 +21,13 @@ import Data.Conduit.Lift
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Set as S
+import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Format
+import Data.Void
 import qualified Dhall as D
+import qualified Dhall.Core as D
+import Dhall.Src (Src)
 import GHC.Generics
 import qualified Language.Haskell.Printf as P
 import Main.Commands
@@ -33,13 +37,13 @@ import Santabot.Bot
 import qualified Text.Casing as Case
 
 data BotConf = BotConf
-  { bcName :: T.Text
+  { bcName :: Text
   -- ^ name for instance
   , bcAlerts :: String
   -- ^ channel to send alerts to
   , bcCommandBots :: [CommandBot]
   , bcAlertBots :: [AlertBot]
-  , bcPhrasebook :: S.Set T.Text
+  , bcPhrasebook :: S.Set Text
   }
   deriving (Generic)
 
@@ -83,7 +87,7 @@ data CommandBot
   | CBCapTimeBot
   | CBNextPuzzle
   | CBIntcode
-  | CBAbout T.Text
+  | CBAbout Text
   | CBTime
   | CBLeaderboard LeaderboardInfo
   deriving (Generic)
@@ -123,10 +127,21 @@ instance D.ToDhall PrivateCappedInfo where
         { D.fieldModifier = T.pack . Case.camel . drop 3 . T.unpack
         }
 
+newtype EventCountdownCond = ECC {eccDhall :: D.Expr Src Void}
+
+interpretECC :: EventCountdownCond -> Maybe (Natural -> Maybe Text)
+interpretECC = D.rawInput (D.function D.inject D.auto) . eccDhall
+
+instance D.FromDhall EventCountdownCond where
+  autoWith _ = D.Decoder (pure . ECC) (pure $ D.Pi Nothing "_" D.Natural (D.App D.Optional D.Text))
+
+instance D.ToDhall EventCountdownCond where
+  injectWith _ = D.Encoder eccDhall (D.Pi Nothing "_" D.Natural (D.App D.Optional D.Text))
+
 data AlertBot
   = ABChallengeCountdown (S.Set ChallengeEvent)
-  | -- | limit
-    ABEventCountdown (Maybe Natural)
+  | -- | seconds since next event
+    ABEventCountdown EventCountdownCond
   | ABBoardCapped
   | ABPrivateCapped PrivateCappedInfo
   deriving (Generic)
@@ -147,8 +162,8 @@ instance D.ToDhall AlertBot where
 
 commandBotBot ::
   (MonadUnliftIO m, MonadFail m, MonadReader Phrasebook m) =>
-    FilePath ->
-  T.Text ->
+  FilePath ->
+  Text ->
   Manager ->
   IORef (Map Nick Paused) ->
   CommandBot ->
@@ -187,16 +202,19 @@ commandBotBot cacheDir name mgr intcodeMap = \case
 
 alertBotBot ::
   (MonadUnliftIO m, MonadReader Phrasebook m) =>
-    FilePath ->
-  T.Text ->
+  FilePath ->
+  Text ->
   AlertBot ->
   Alert m
 alertBotBot cacheDir name = \case
   ABChallengeCountdown evts -> challengeCountdown evts
-  ABEventCountdown lim -> eventCountdown lim
+  ABEventCountdown ecc -> case interpretECC ecc of
+    Nothing -> error "Bad Event Countdown Predicate, should not have typechecked"
+    Just lim -> eventCountdown lim
   ABBoardCapped -> boardCapped cacheDir
   ABPrivateCapped PrivateCappedInfo{..} ->
-    privateCapped cacheDir
+    privateCapped
+      cacheDir
       pciSession
       name
       (liLeaderboard pciLeaderboardInfo)

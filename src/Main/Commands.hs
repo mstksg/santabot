@@ -263,32 +263,30 @@ challengeCountdown evtSet =
 
 eventCountdown ::
   (MonadIO m, MonadReader Phrasebook m) =>
-  Maybe Natural ->
+  -- | days til next event, seconds til next event
+  (Natural -> Maybe Text) ->
   Alert m
 eventCountdown lim =
   A
     { aTrigger = pure . countdownEvent
-    , aResp = fmap (True,) . addSantaPhrase . T.pack . uncurry displayCE
+    , aResp = fmap (True,) . addSantaPhrase . T.pack . displayCE
     }
   where
     countdownEvent i = do
-      guard $ LocalTime d midnight `I.member` i
       guard $ m < 12
-      guard $ daysLeft > 0
-      forM_ lim $ \maxDay ->
-        guard $ daysLeft <= fromIntegral maxDay
-      pure (daysLeft, y)
+      secsLeft <- listToMaybe $ mapMaybe lim secs
+      pure (secsLeft, y)
       where
         d = localDay $ I.sup i
         (y, m, _) = toGregorian d
-        daysLeft = fromGregorian y 12 1 `diffDays` d
+        nextEvent = fromGregorian y 12 1
+        nextEventSecs = LocalTime nextEvent midnight
+        secs :: [Natural]
+        secs =
+          [ceiling (I.inf i `diffLocalTime` nextEventSecs) .. floor (I.inf i `diffLocalTime` nextEventSecs)]
 
-    displayCE :: Integer -> Integer -> String
-    displayCE d = [P.s|%d day%s left until Advent of Code %d!|] d suff
-      where
-        suff
-          | d == 1 = "" :: String
-          | otherwise = "s"
+    displayCE :: (Text, Integer) -> String
+    displayCE (s, y) = [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
 
 getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))
 getCapTime y d = liftIO $ do
