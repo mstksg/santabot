@@ -288,7 +288,7 @@ eventCountdown lim =
           <> show i
           <> " with secs "
           <> show secs
-      pure (display, y)
+      pure (display, i, y)
       where
         d = localDay $ I.sup i
         (y, m, _) = toGregorian d
@@ -298,8 +298,8 @@ eventCountdown lim =
         secs =
           [ceiling (nextEventSecs `diffLocalTime` I.sup i) .. floor (nextEventSecs `diffLocalTime` I.inf i)]
 
-    displayCE :: ((Text, (UTCTime, UTCTime)), Integer) -> String
-    displayCE ((s, (t, t')), y) = traceShow (t, t', t' `diffUTCTime` t) [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
+    displayCE :: ((Text, (UTCTime, UTCTime)), I.Interval LocalTime, Integer) -> String
+    displayCE ((s, (t, t')), i, y) = traceShow (t, t', t' `diffUTCTime` t, i) [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
 
 timeEval :: (Natural -> Maybe Text) -> Natural -> Maybe (Text, (UTCTime, UTCTime))
 timeEval f n = unsafePerformIO do
