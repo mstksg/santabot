@@ -264,7 +264,7 @@ challengeCountdown evtSet =
 
 eventCountdown ::
   (MonadIO m, MonadReader Phrasebook m) =>
-  -- | days til next event, seconds til next event
+  -- | seconds til next event
   (Natural -> Maybe Text) ->
   Alert m
 eventCountdown lim =
@@ -275,8 +275,9 @@ eventCountdown lim =
   where
     countdownEvent i = do
       guard $ m < 12
-      secsLeft <- listToMaybe $ mapMaybe lim secs
-      pure (secsLeft, y)
+      (display, triggered) <- listToMaybe $ mapMaybe (\t -> (,t) <$> lim t) secs
+      traceM $ "Triggered on: " <> show triggered <> " seconds in interval " <> show i <> " with secs " <> show secs
+      pure (display, y)
       where
         d = localDay $ I.sup i
         (y, m, _) = toGregorian d
