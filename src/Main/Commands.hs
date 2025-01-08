@@ -37,6 +37,8 @@ import Advent.API as Advent
 import Advent.Reddit
 import Advent.Types
 import Conduit
+import Control.DeepSeq
+import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.Combinators
 import Control.Monad.Reader
@@ -57,10 +59,12 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TL
+import Data.Time
 import Data.Time as Time
 import Debug.Trace
 import qualified Dhall as D
 import GHC.Generics
+import GHC.IO.Unsafe
 import qualified HTMLEntities.Decoder as HTML
 import qualified Language.Haskell.Printf as P
 import qualified Numeric.Interval as I
@@ -275,8 +279,15 @@ eventCountdown lim =
   where
     countdownEvent i = do
       guard $ m < 12
-      (display, triggered) <- listToMaybe $ mapMaybe (\t -> (,t) <$> lim t) secs
-      traceM $ "Triggered on: " <> show triggered <> " seconds in interval " <> show i <> " with secs " <> show secs
+      traceM $ show (i, secs)
+      (display, triggered) <- listToMaybe $ mapMaybe (\t -> (,t) <$> timeEval lim t) secs
+      traceM $
+        "Triggered on: "
+          <> show triggered
+          <> " seconds in interval "
+          <> show i
+          <> " with secs "
+          <> show secs
       pure (display, y)
       where
         d = localDay $ I.sup i
@@ -287,8 +298,15 @@ eventCountdown lim =
         secs =
           [ceiling (nextEventSecs `diffLocalTime` I.sup i) .. floor (nextEventSecs `diffLocalTime` I.inf i)]
 
-    displayCE :: (Text, Integer) -> String
-    displayCE (s, y) = [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
+    displayCE :: ((Text, (UTCTime, UTCTime)), Integer) -> String
+    displayCE ((s, (t, t')), y) = traceShow (t, t', t' `diffUTCTime` t) [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
+
+timeEval :: (Natural -> Maybe Text) -> Natural -> Maybe (Text, (UTCTime, UTCTime))
+timeEval f n = unsafePerformIO do
+  t <- getCurrentTime
+  res <- evaluate $ force (f n)
+  t' <- getCurrentTime
+  pure $ (,(t, t')) <$> res
 
 getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))
 getCapTime y d = liftIO $ do
