@@ -279,7 +279,6 @@ eventCountdown lim =
   where
     countdownEvent i = do
       guard $ m < 12
-      traceM $ show (i, secs)
       (display, triggered) <- listToMaybe $ mapMaybe (\t -> (,t) <$> timeEval lim t) secs
       traceM $
         "Triggered on: "
