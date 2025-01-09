@@ -11,14 +11,13 @@ import qualified Dhall.Pretty as D
 import GHC.Generics
 import Main.Master
 import Network.HTTP.Client.TLS
-import Numeric.Natural
 import qualified Options.Applicative as O
 import qualified Prettyprinter.Render.Text as PP
 import Santabot.Run.IRC
 import qualified Text.Casing as Case
 
 data Conf = Conf
-  { cTick :: Natural
+  { cTick :: Double
   -- ^ in seconds
   , cNick :: String
   -- ^ bot username
@@ -72,5 +71,5 @@ main = do
     cNick
     cPassword
     cSasl
-    (fromIntegral cTick * 1000000)
+    (round $ cTick * 1000000)
     (masterBot cBotConf mgr intcodeMap cacheDir)

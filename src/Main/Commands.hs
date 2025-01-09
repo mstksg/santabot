@@ -37,8 +37,6 @@ import Advent.API as Advent
 import Advent.Reddit
 import Advent.Types
 import Conduit
-import Control.DeepSeq
-import Control.Exception (evaluate)
 import Control.Monad
 import Control.Monad.Combinators
 import Control.Monad.Reader
@@ -61,10 +59,8 @@ import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TL
 import Data.Time
 import Data.Time as Time
-import Debug.Trace
 import qualified Dhall as D
 import GHC.Generics
-import GHC.IO.Unsafe
 import qualified HTMLEntities.Decoder as HTML
 import qualified Language.Haskell.Printf as P
 import qualified Numeric.Interval as I
@@ -192,7 +188,7 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
   t <- liftIO aocServerTime
   let (y, d) = nextDay (localDay t)
       nextTime = LocalTime (fromGregorian y 12 (fromIntegral (dayInt d))) midnight
-      dur = traceShowId $ realToFrac $ nextTime `diffLocalTime` t
+      dur = realToFrac $ nextTime `diffLocalTime` t
       durString =
         T.unpack . T.strip . T.pack $
           DD.humanReadableDuration dur
@@ -279,15 +275,8 @@ eventCountdown lim =
   where
     countdownEvent i = do
       guard $ m < 12
-      (display, triggered) <- listToMaybe $ mapMaybe (\t -> (,t) <$> timeEval lim t) secs
-      traceM $
-        "Triggered on: "
-          <> show triggered
-          <> " seconds in interval "
-          <> show i
-          <> " with secs "
-          <> show secs
-      pure (display, i, y)
+      display <- listToMaybe $ mapMaybe lim secs
+      pure (display, y)
       where
         d = localDay $ I.sup i
         (y, m, _) = toGregorian d
@@ -297,15 +286,8 @@ eventCountdown lim =
         secs =
           [ceiling (nextEventSecs `diffLocalTime` I.sup i) .. floor (nextEventSecs `diffLocalTime` I.inf i)]
 
-    displayCE :: ((Text, (UTCTime, UTCTime)), I.Interval LocalTime, Integer) -> String
-    displayCE ((s, (t, t')), i, y) = traceShow (t, t', t' `diffUTCTime` t, i) [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
-
-timeEval :: (Natural -> Maybe Text) -> Natural -> Maybe (Text, (UTCTime, UTCTime))
-timeEval f n = unsafePerformIO do
-  t <- getCurrentTime
-  res <- evaluate $ force (f n)
-  t' <- getCurrentTime
-  pure $ (,(t, t')) <$> res
+    displayCE :: (Text, Integer) -> String
+    displayCE (s, y) = [P.s|%s left until Advent of Code %d!|] (T.unpack s) y
 
 getCapTime :: MonadIO m => Integer -> Advent.Day -> m (Maybe (UTCTime, Maybe UTCTime))
 getCapTime y d = liftIO $ do

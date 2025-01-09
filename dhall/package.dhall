@@ -81,12 +81,12 @@ in  { types
               }
               (exactDays n)
       , pow2Days =
-          λ(lim : Natural) →
+          λ(minDays : Natural) →
           λ(n : Natural) →
             merge
               { Some =
                   λ(d : Natural) →
-                    if    lessThanEqual d lim
+                    if    lessThanEqual d minDays
                     then  merge
                             { Some =
                                 λ(p : Natural) →
@@ -99,9 +99,9 @@ in  { types
               }
               (exactDays n)
       , pow2Secs =
-          λ(limSecs : Natural) →
+          λ(minSecs : Natural) →
           λ(n : Natural) →
-            if    lessThanEqual n limSecs
+            if    lessThanEqual n minSecs
             then  merge
                     { Some =
                         λ(p : Natural) →
@@ -110,6 +110,11 @@ in  { types
                     }
                     (powerOfTwo n)
             else  None Text
+      , eitherOr =
+          λ(f : Natural → Optional Text) →
+          λ(g : Natural → Optional Text) →
+          λ(n : Natural) →
+            merge { Some = λ(p : Text) → Some p, None = g n } (f n)
       }
     , defaultCommandBots =
         λ(about : Text) →
