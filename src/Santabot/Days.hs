@@ -7,7 +7,7 @@ module Santabot.Days (
 
 import Advent
 import Control.Monad (guard)
-import Data.Finite (finites)
+import Data.List (unfoldr)
 
 mkDayForYear :: Integer -> Integer -> Maybe Day
 mkDayForYear y n = do
@@ -16,7 +16,11 @@ mkDayForYear y n = do
   pure d
 
 daysForYear :: Integer -> [Day]
-daysForYear y = filter ((<= maxDayForYear y) . dayInt) (Day <$> finites)
+daysForYear y = unfoldr nextDay 1
+ where
+  nextDay n = do
+    d <- mkDayForYear y n
+    pure (d, n + 1)
 
 maxDayForYear :: Integer -> Integer
 maxDayForYear y
