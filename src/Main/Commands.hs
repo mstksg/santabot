@@ -248,13 +248,14 @@ challengeCountdown evtSet =
     }
   where
     challengeEvent :: I.Interval LocalTime -> Maybe (ChallengeEvent, (Advent.Day, Integer))
-    challengeEvent i = do
-      guard $ (mm == 12 && dd <= maxDayForYear yy) || (mm == 11 && dd == 30)
-      M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $
-        M.fromSet id evtSet
+    challengeEvent i = case mm of
+      11 | dd == 30 -> findEvent
+      12 -> mkDayForYear yy (fromIntegral dd) *> findEvent
+      _ -> Nothing
       where
         d = localDay $ I.sup i
         (yy, mm, dd) = toGregorian d
+        findEvent = M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $ M.fromSet id evtSet
         pick (t, d') = (d', yy) <$ guard (t `I.member` i)
     displayCE (d, yr) = \case
       CEHour -> (False, [P.s|One hour until Day %d challenge!|] (dayInt d))

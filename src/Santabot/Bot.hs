@@ -237,7 +237,7 @@ risingEdgeAlert cacheDir capLog delay noticeMe trigger response =
     logDir = cacheDir </> capLog
     risingEdge i@(I.sup -> isup) = runMaybeT $ do
       liftIO $ createDirectoryIfMissing True logDir
-      guard $ mm == 12 && dd <= maxDayForYear yy
+      guard $ mm == 12
       guard $ withDelay `I.member` i
       d' <- maybe empty pure $ mkDayForYear yy (fromIntegral dd)
       let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
