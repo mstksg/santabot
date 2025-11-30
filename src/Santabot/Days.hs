@@ -18,7 +18,7 @@ mkDayForYear y n = do
 daysForYear :: Integer -> [Day]
 daysForYear y = filter ((<= maxDayForYear y) . dayInt) (Day <$> finites)
 
-maxDayForYear :: Integer -> Int
+maxDayForYear :: Integer -> Integer
 maxDayForYear y
   | y >= 2025 = 12
   | otherwise = 25
