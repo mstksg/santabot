@@ -36,6 +36,7 @@ library
     Main.Commands
     Main.Master
     Santabot.Bot
+    Santabot.Days
     Santabot.Run.IRC
     Santabot.Run.Slack
     Slack.Servant
