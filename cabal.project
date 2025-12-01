@@ -6,3 +6,10 @@ source-repository-package
   location: https://github.com/mstksg/simpleirc
   tag: 57a087b22d74cf322dbbbf4a04c22be93731b350
   --sha256: 1fr6bhjsl7xzwg2bdvq2c8zf568ccvf06d8aipfhfvg8d5mmm3d2
+
+-- just for now until it gets on hackage
+source-repository-package
+  type: git
+  location: https://github.com/mstksg/advent-of-code-api
+  tag: 145bcec5961994e2e0c741c56b830526735337ec
+  --sha256: 1pccr8xihfi9mxl7j252abxx4b0byvpdifqrcv2bkiwnl4z6d2hl
