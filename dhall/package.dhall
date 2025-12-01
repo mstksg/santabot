@@ -144,7 +144,6 @@ in  { types
           ) →
             [ AlertBot.ChallengeCountdown ce
             , AlertBot.EventCountdown limit
-            , AlertBot.BoardCapped
             ]
           # merge
               { Some =
