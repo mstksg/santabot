@@ -51,6 +51,7 @@ import Numeric.Interval (Interval, (...))
 import qualified Numeric.Interval as I
 import System.Directory
 import System.FilePath
+import Santabot.Days
 
 data Message = M
   { mRoom :: String
@@ -238,7 +239,7 @@ risingEdgeAlert cacheDir capLog delay noticeMe trigger response =
       liftIO $ createDirectoryIfMissing True logDir
       guard $ mm == 12
       guard $ withDelay `I.member` i
-      d' <- maybe empty pure $ mkDay (fromIntegral dd)
+      d' <- maybe empty pure $ mkDayForYear yy (fromIntegral dd)
       let logFP = logDir </> [P.s|%d-%02d|] yy (dayInt d') -<.> "yaml"
       liftIO (getCapState logFP) >>= \case
         CSPos -> empty
