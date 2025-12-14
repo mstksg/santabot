@@ -43,7 +43,6 @@ import Control.Monad.Reader
 import Control.Monad.Trans.Maybe
 import Data.Char
 import qualified Data.Duration as DD
-import Data.Finite
 import Data.Foldable
 import Data.List.NonEmpty (NonEmpty (..))
 import qualified Data.List.NonEmpty as NE
@@ -57,7 +56,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TL
-import Data.Time
 import Data.Time as Time
 import qualified Dhall as D
 import GHC.Generics
@@ -66,6 +64,7 @@ import qualified Language.Haskell.Printf as P
 import qualified Numeric.Interval as I
 import Numeric.Natural
 import Santabot.Bot
+import Santabot.Days
 import Servant.API
 import Servant.Client.Core
 import Servant.Links
@@ -138,7 +137,7 @@ askLink M{..} = do
   case listToMaybe (mapMaybe mkDay w) of
     Nothing -> do
       (y, m, d) <- toGregorian . localDay <$> liftIO aocServerTime
-      case mkDay (fromIntegral d) of
+      case mkDayForYear y (fromIntegral d) of
         Just dd
           | m == 12
           , dd `S.member` fold (M.lookup y allP) ->
@@ -181,7 +180,7 @@ allPuzzles = do
   vy <- validYears
   sequence . flip M.fromSet vy $ \y ->
     S.fromList
-      <$> filterM (challengeReleased y) (Day <$> finites)
+      <$> filterM (challengeReleased y) (daysForYear y)
 
 nextPuzzle :: (MonadIO m, MonadReader Phrasebook m) => Command m
 nextPuzzle = simpleCommand "next" "Display the time until the next puzzle release." $ do
@@ -200,7 +199,7 @@ nextPuzzle = simpleCommand "next" "Display the time until the next puzzle releas
   where
     nextDay (toGregorian -> (y, m, d))
       | m < 12 = (y, minBound)
-      | otherwise = case mkDay (fromIntegral d + 1) of
+      | otherwise = case mkDayForYear y (fromIntegral d + 1) of
           Nothing -> (y + 1, minBound)
           Just d' -> (y, d')
 
@@ -227,12 +226,12 @@ instance D.ToDhall ChallengeEvent where
 
 ceTrigger :: Time.Day -> ChallengeEvent -> Maybe (LocalTime, Advent.Types.Day)
 ceTrigger d = \case
-  CEStart -> (LocalTime d midnight,) <$> mkDay (fromIntegral dd)
-  CEHour -> (LocalTime d (TimeOfDay 23 0 0),) <$> mkDay (fromIntegral dd')
-  CETenMin -> (LocalTime d (TimeOfDay 23 50 0),) <$> mkDay (fromIntegral dd')
-  CEMinute -> (LocalTime d (TimeOfDay 23 59 0),) <$> mkDay (fromIntegral dd')
+  CEStart -> (LocalTime d midnight,) <$> mkDayForYear yy (fromIntegral dd)
+  CEHour -> (LocalTime d (TimeOfDay 23 0 0),) <$> mkDayForYear yy (fromIntegral dd')
+  CETenMin -> (LocalTime d (TimeOfDay 23 50 0),) <$> mkDayForYear yy (fromIntegral dd')
+  CEMinute -> (LocalTime d (TimeOfDay 23 59 0),) <$> mkDayForYear yy (fromIntegral dd')
   where
-    (_, _, dd) = toGregorian d
+    (yy, _, dd) = toGregorian d
     (_, _, dd') = toGregorian (succ d)
 
 challengeCountdown ::
@@ -248,13 +247,14 @@ challengeCountdown evtSet =
     }
   where
     challengeEvent :: I.Interval LocalTime -> Maybe (ChallengeEvent, (Advent.Day, Integer))
-    challengeEvent i = do
-      guard $ (mm == 12 && dd < 26) || (mm == 11 && dd == 30)
-      M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $
-        M.fromSet id evtSet
+    challengeEvent i = case mm of
+      11 | dd == 30 -> findEvent
+      12 -> mkDayForYear yy (fromIntegral dd) *> findEvent
+      _ -> Nothing
       where
         d = localDay $ I.sup i
         (yy, mm, dd) = toGregorian d
+        findEvent = M.lookupMin . M.mapMaybe (pick <=< ceTrigger d) $ M.fromSet id evtSet
         pick (t, d') = (d', yy) <$ guard (t `I.member` i)
     displayCE (d, yr) = \case
       CEHour -> (False, [P.s|One hour until Day %d challenge!|] (dayInt d))
