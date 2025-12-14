@@ -56,7 +56,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TL
-import Data.Time
 import Data.Time as Time
 import qualified Dhall as D
 import GHC.Generics

@@ -1,5 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
-
+-- | TODO: this should all be absorbed into advent-of-code-api somehow
 module Santabot.Days (
   mkDayForYear,
   daysForYear,
